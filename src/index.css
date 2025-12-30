@@ -1,0 +1,49 @@
+/* Basic resets if needed, but relying mostly on Bootstrap */
+:root {
+  --bs-body-bg: #f8f9fa;
+  /* Light grey background for dashboard feel */
+}
+
+body {
+  background-color: var(--bs-body-bg);
+}
+
+/* Custom scrollbar to match Bootstrap feel if desired, or just default */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Custom Dropdown Styling */
+.dropdown-item-custom {
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.dropdown-item-custom:hover {
+  background-color: #f8f9fa;
+  /* Bootstrap Gray-100 */
+}
+
+.dropdown-item-custom .form-check-input {
+  cursor: pointer;
+}
+
+.dropdown-item-custom .form-check-label {
+  cursor: pointer;
+  width: 100%;
+}

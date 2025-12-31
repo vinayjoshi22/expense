@@ -16,6 +16,7 @@ import { DashboardControls } from './components/dashboard/DashboardControls';
 import { HowItWorksModal } from './components/ui/HowItWorksModal';
 import { InvestmentList } from './components/dashboard/InvestmentList';
 import { BulkCategoryModal } from './components/dashboard/BulkCategoryModal';
+import { ReviewModal } from './components/dashboard/ReviewModal';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
@@ -271,7 +272,9 @@ function App() {
       let detectedCurrency = currency;
       let newInvestments: Investment[] = [];
 
-      // Process JSON Files
+      const rawTexts: string[] = []; // Store raw text for refinement
+
+      // Process JSON Files (No LLM, direct import - skip review? Or review too? User asked for "intermediate step between file upload + LLM parsing", usually imports are trusted. Let's trust JSON for now or just merge them? Spec says "User will review the transactions...". Let's show JSON results in review too for consistency if requested, but LLM parsing flow is the main target. I'll include JSON results in the review preview so they can confirm before merging.)
       for (const file of jsonFiles) {
         const text = await file.text();
         let data;
@@ -292,16 +295,25 @@ function App() {
       if (pdfFiles.length > 0) {
         for (const file of pdfFiles) {
           const text = await parseFile(file);
+          rawTexts.push(text); // Save for redo
           const result = await analyzeFinancialText(apiKey, text, model);
           newTransactions.push(...result.transactions);
           if (result.currency) detectedCurrency = result.currency;
         }
       }
 
-      setTransactions(prev => mergeTransactions(prev, newTransactions));
-      setInvestments(prev => mergeInvestments(prev, newInvestments));
-      setCurrency(detectedCurrency);
-      setShowUpload(false);
+      // Instead of merging immediately, trigger Review
+      if (newTransactions.length > 0 || newInvestments.length > 0) {
+        setReviewData({
+          transactions: newTransactions,
+          rawTexts, // Only has PDF texts
+          newInvestments,
+          detectedCurrency
+        });
+        setShowReviewModal(true);
+      } else {
+        setError({ title: "No Data Found", message: "Could not extract any transactions." });
+      }
 
     } catch (err: any) {
       console.error(err);
@@ -420,6 +432,48 @@ function App() {
       ));
     }
     cleanBulkModal();
+  };
+
+  // Review Modal State
+  const [reviewData, setReviewData] = useState<{ transactions: Transaction[], rawTexts: string[], newInvestments: Investment[], detectedCurrency: string } | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  // Redo Analysis with Feedback
+  const handleReviewRedo = async (feedback: string) => {
+    if (!reviewData) return;
+    setIsProcessing(true);
+    try {
+      const newTransactions: Transaction[] = [];
+      // Re-process all raw texts with feedback
+      for (const text of reviewData.rawTexts) {
+        const result = await analyzeFinancialText(apiKey, text, model, feedback);
+        newTransactions.push(...result.transactions);
+      }
+
+      // Update review data with new results
+      setReviewData(prev => prev ? { ...prev, transactions: newTransactions } : null);
+    } catch (err: any) {
+      console.error(err);
+      setError({ title: "Refinement Failed", message: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReviewApprove = () => {
+    if (!reviewData) return;
+    setTransactions(prev => mergeTransactions(prev, reviewData.transactions));
+    setInvestments(prev => mergeInvestments(prev, reviewData.newInvestments));
+    setCurrency(reviewData.detectedCurrency);
+
+    setReviewData(null);
+    setShowReviewModal(false);
+    setShowUpload(false);
+  };
+
+  const handleReviewCancel = () => {
+    setReviewData(null);
+    setShowReviewModal(false);
   };
 
   // Calculations (Use filteredTransactions)
@@ -668,6 +722,18 @@ function App() {
         onUpdateAll={() => confirmBulkUpdate('all')}
         matchCountFiltered={bulkModal.matchCountFiltered}
         matchCountAll={bulkModal.matchCountAll}
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        show={showReviewModal}
+        onHide={handleReviewCancel} // Clicking backdrop cancels (or we can enforce specific button, user said "Cancel then ... permanently")
+        transactions={reviewData?.transactions || []}
+        currency={reviewData?.detectedCurrency || currency}
+        isProcessing={isProcessing}
+        onApprove={handleReviewApprove}
+        onCancel={handleReviewCancel}
+        onRedo={handleReviewRedo}
       />
 
       {/* Transaction Delete Warning Modal */}

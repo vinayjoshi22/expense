@@ -1,14 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { AnalysisResult } from '../types';
 
-export const analyzeFinancialText = async (apiKey: string, text: string, modelName: string = "gemini-1.5-flash"): Promise<AnalysisResult> => {
+export const analyzeFinancialText = async (apiKey: string, text: string, modelName: string = "gemini-2.5-flash-lite", feedback?: string): Promise<AnalysisResult> => {
   if (!apiKey) throw new Error("API Key is required");
 
   // Initialize Gemini
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
 
-  const prompt = `
+  let prompt = `
     You are an expert financial analyst. Analyze the following bank statement text and extract all transactions.
     
     1. **Currency Detection**: Look for currency symbols ($, £, €, ₹) or location clues (e.g., "London" -> GBP, "Mumbai" -> INR, "New York" -> USD). Default to USD if unsure.
@@ -22,7 +22,13 @@ export const analyzeFinancialText = async (apiKey: string, text: string, modelNa
         { "date": "2023-10-01", "description": "Starbucks", "amount": 5.50, "type": "debit", "category": "Food" }
       ]
     }
+  `;
 
+  if (feedback) {
+    prompt += `\n\n**IMPORTANT USER FEEDBACK FROM PREVIOUS RUN**: ${feedback}\n Please adjust your analysis strictly based on this feedback.`;
+  }
+
+  prompt += `
     Text to analyze:
     ${text.substring(0, 50000)}
   `;

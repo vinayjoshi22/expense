@@ -461,9 +461,12 @@ function App() {
     updateSingleTransaction(id, field, value);
   };
 
+
+
   const cleanBulkModal = () => setBulkModal({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
 
   const confirmBulkUpdate = (mode: 'single' | 'filtered' | 'all') => {
+    // ... (existing logic)
     if (!bulkModal.transaction) return;
 
     const targetDesc = bulkModal.transaction.description.trim();
@@ -490,7 +493,20 @@ function App() {
     cleanBulkModal();
   };
 
-  // Review Modal State
+  const handleAddTransaction = () => {
+    const newTx: Transaction = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().split('T')[0],
+      description: 'New Transaction',
+      amount: 0,
+      category: 'Uncategorized',
+      type: 'debit'
+    };
+    // Add to top of list
+    setTransactions(prev => [newTx, ...prev]);
+  };
+
+  // ... (ReviewModal State)
   const [reviewData, setReviewData] = useState<{ transactions: Transaction[], rawTexts: string[], newInvestments: Investment[], detectedCurrency: string } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
@@ -769,6 +785,7 @@ function App() {
                   onDeleteTransaction={handleDeleteTransaction}
                   showDuplicates={showDuplicates}
                   onToggleDuplicates={() => setShowDuplicates(!showDuplicates)}
+                  onAddTransaction={handleAddTransaction}
                 />
               </Col>
             </Row>

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, Table, Badge, Form, InputGroup, Row, Col, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import type { Transaction } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
-import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2, Copy } from 'lucide-react';
+import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2, Copy, Plus } from 'lucide-react';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
 import { EditableCell } from '../ui/EditableCell';
 
@@ -48,13 +48,15 @@ export function TransactionTable({
     onCategoryChange,
     allCategories,
     showDuplicates,
-    onToggleDuplicates
+    onToggleDuplicates,
+    onAddTransaction
 }: TransactionTableProps & {
     searchTerm: string;
     onSearchChange: (val: string) => void;
     categoryFilter: string;
     onCategoryChange: (val: string) => void;
     allCategories: string[];
+    onAddTransaction: () => void;
 }) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
 
@@ -119,6 +121,17 @@ export function TransactionTable({
                     </Col>
                     <Col md={8}>
                         <Row className="g-2 justify-content-end">
+                            <Col xs="auto">
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={onAddTransaction}
+                                    className="d-flex align-items-center gap-1"
+                                >
+                                    <Plus size={14} />
+                                    <span className="d-none d-sm-inline">Add</span>
+                                </Button>
+                            </Col>
                             <Col xs="auto">
                                 <OverlayTrigger placement="top" overlay={<Tooltip>Show Duplicates (Same Description & Amount)</Tooltip>}>
                                     <Button

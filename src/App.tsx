@@ -65,6 +65,32 @@ function App() {
     setInvestments(prev => prev.filter(i => i.id !== id));
   };
 
+  // Transaction Delete Logic
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showTxDeleteConfirm, setShowTxDeleteConfirm] = useState(false);
+  const [dontAskDeleteAgain, setDontAskDeleteAgain] = useState(() => localStorage.getItem('EA_SKIP_DELETE_WARNING') === 'true');
+
+  const handleDeleteTransaction = (id: string) => {
+    if (dontAskDeleteAgain) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } else {
+      setDeleteId(id);
+      setShowTxDeleteConfirm(true);
+    }
+  };
+
+  const confirmTxDelete = (skipFuture: boolean) => {
+    if (deleteId) {
+      setTransactions(prev => prev.filter(t => t.id !== deleteId));
+      if (skipFuture) {
+        localStorage.setItem('EA_SKIP_DELETE_WARNING', 'true');
+        setDontAskDeleteAgain(true);
+      }
+      setShowTxDeleteConfirm(false);
+      setDeleteId(null);
+    }
+  };
+
   // Extract Available Years and Months
   const { availableYears, availableMonths } = useMemo(() => {
     const years = new Set<string>();
@@ -497,6 +523,7 @@ function App() {
                   categoryFilter={categoryFilter}
                   onCategoryChange={setCategoryFilter}
                   allCategories={allCategories}
+                  onDeleteTransaction={handleDeleteTransaction}
                 />
               </Col>
             </Row>
@@ -516,6 +543,34 @@ function App() {
         matchCountFiltered={bulkModal.matchCountFiltered}
         matchCountAll={bulkModal.matchCountAll}
       />
+
+      {/* Transaction Delete Warning Modal */}
+      <Modal show={showTxDeleteConfirm} onHide={() => setShowTxDeleteConfirm(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="h5 text-danger">Delete Transaction?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to delete this transaction? This action cannot be undone.</p>
+          <Form.Check
+            type="checkbox"
+            label="Don't ask me again"
+            id="dont-ask-delete"
+            onChange={() => {
+              // We handle the actual persistence in the Confirm button click, 
+              // but we can just pass the checkbox state to the handler.
+              // Actually, let's use a local ref or state for the checkbox if we want to read it on submit?
+              // Simplest: The handler accepts a boolean. Logic below.
+            }}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTxDeleteConfirm(false)}>Cancel</Button>
+          <Button variant="danger" onClick={() => {
+            const checkbox = document.getElementById('dont-ask-delete') as HTMLInputElement;
+            confirmTxDelete(checkbox?.checked || false);
+          }}>Delete Permanently</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Card, Table, Badge, Form, InputGroup, Row, Col } from 'react-bootstrap';
+import { Card, Table, Badge, Form, InputGroup, Row, Col, Button } from 'react-bootstrap';
 import type { Transaction } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
-import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter } from 'lucide-react';
+import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2 } from 'lucide-react';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
 import { EditableCell } from '../ui/EditableCell';
 
@@ -10,6 +10,7 @@ interface TransactionTableProps {
     transactions: Transaction[];
     currency: string;
     onUpdateTransaction: (id: string, field: keyof Transaction, value: any) => void;
+    onDeleteTransaction: (id: string) => void;
 }
 
 const getBadgeVariant = (category: string) => {
@@ -38,6 +39,7 @@ export function TransactionTable({
     transactions,
     currency,
     onUpdateTransaction,
+    onDeleteTransaction,
     searchTerm,
     onSearchChange,
     categoryFilter,
@@ -149,6 +151,9 @@ export function TransactionTable({
                             <th className="text-end pe-3 text-muted fw-semibold pointer" onClick={() => handleSort('amount')} style={{ cursor: 'pointer' }}>
                                 AMOUNT <SortIcon column="amount" />
                             </th>
+                            <th className="text-end pe-3 text-muted fw-semibold">
+                                ACTION
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,6 +193,11 @@ export function TransactionTable({
                                             format={(val) => formatCurrency(val, currency)}
                                         />
                                     </div>
+                                </td>
+                                <td className="text-end pe-3">
+                                    <Button variant="link" className="text-danger p-0" size="sm" onClick={() => onDeleteTransaction(t.id)}>
+                                        <Trash2 size={14} />
+                                    </Button>
                                 </td>
                             </tr>
                         ))}

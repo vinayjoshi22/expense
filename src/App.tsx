@@ -17,6 +17,7 @@ import { HowItWorksModal } from './components/ui/HowItWorksModal';
 import { InvestmentList } from './components/dashboard/InvestmentList';
 import { BulkCategoryModal } from './components/dashboard/BulkCategoryModal';
 import { ReviewModal } from './components/dashboard/ReviewModal';
+import { ClearDataModal } from './components/dashboard/ClearDataModal';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
@@ -45,7 +46,6 @@ function App() {
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showKeyInput, setShowKeyInput] = useState(!apiKey);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -341,16 +341,39 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const clearData = () => {
-    setShowDeleteConfirm(true);
-  };
+  const [showClearDataModal, setShowClearDataModal] = useState(false);
 
-  const confirmDelete = () => {
+  const handleClearAll = () => {
     setTransactions([]);
     setInvestments([]);
     setCurrency('USD');
     clearStorage();
-    setShowDeleteConfirm(false);
+  };
+
+  const handleClearInvestments = () => {
+    setInvestments([]);
+  };
+
+  const handleClearTransactions = (year?: string, month?: string) => {
+    if (!year && !month) {
+      setTransactions([]); // Clear all
+      return;
+    }
+
+    setTransactions(prev => prev.filter(t => {
+      const d = new Date(t.date);
+      const tYear = d.getFullYear().toString();
+      const tMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+
+      if (year && month) {
+        // Delete if matches BOTH
+        return !(tYear === year && tMonth === month);
+      } else if (year) {
+        // Delete if matches YEAR
+        return tYear !== year;
+      }
+      return true;
+    }));
   };
 
   const saveKey = (key: string) => {
@@ -557,7 +580,7 @@ function App() {
                     <Plus size={16} className={`me-1 transition-transform ${showUpload ? 'rotate-45' : ''}`} />
                     Add Files
                   </Button>
-                  <Button variant="danger" size="sm" onClick={clearData}>
+                  <Button variant="danger" size="sm" onClick={() => setShowClearDataModal(true)}>
                     <Trash2 size={14} />
                   </Button>
                 </>
@@ -570,20 +593,14 @@ function App() {
         </Container>
       </Navbar>
 
-      {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="text-danger h5">⚠️ Irreversible Action</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Are you sure you want to clear all data?</p>
-          <p className="text-muted small mb-0">This will remove all stored transactions and settings. This action cannot be undone.</p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-          <Button variant="danger" onClick={confirmDelete}>Clear Everything</Button>
-        </Modal.Footer>
-      </Modal>
+      <ClearDataModal
+        show={showClearDataModal}
+        onHide={() => setShowClearDataModal(false)}
+        onClearAll={handleClearAll}
+        onClearInvestments={handleClearInvestments}
+        onClearTransactions={handleClearTransactions}
+        availableYears={availableYears}
+      />
 
       {/* How It Works Modal */}
       <HowItWorksModal show={showHowItWorks} onHide={() => setShowHowItWorks(false)} />

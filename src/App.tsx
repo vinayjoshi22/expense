@@ -424,11 +424,27 @@ function App() {
     matchCountAll: number;
   }>({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
 
+  const cleanBulkModal = () => setBulkModal({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
+
   // Update Transaction Helper
   const updateSingleTransaction = (id: string, field: keyof Transaction, value: any) => {
-    setTransactions(prev => prev.map(t =>
-      t.id === id ? { ...t, [field]: value } : t
-    ));
+    setTransactions(prev => prev.map(t => {
+      if (t.id !== id) return t;
+
+      const updates: Partial<Transaction> = { [field]: value };
+
+      // Auto-update type if category changes to/from Income
+      if (field === 'category') {
+        if (value === 'Income') {
+          updates.type = 'credit';
+        } else if (t.category === 'Income' && value !== 'Income') {
+          // If moving AWAY from Income, revert to debit (default assumption for expenses)
+          updates.type = 'debit';
+        }
+      }
+
+      return { ...t, ...updates };
+    }));
   };
 
   // Update Transaction Field
@@ -460,10 +476,6 @@ function App() {
     // Default: Single update
     updateSingleTransaction(id, field, value);
   };
-
-
-
-  const cleanBulkModal = () => setBulkModal({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
 
   const confirmBulkUpdate = (mode: 'single' | 'filtered' | 'all') => {
     // ... (existing logic)

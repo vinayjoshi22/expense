@@ -1,12 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { AnalysisResult } from '../types';
 
-export const analyzeFinancialText = async (apiKey: string, text: string): Promise<AnalysisResult> => {
+export const analyzeFinancialText = async (apiKey: string, text: string, modelName: string = "gemini-1.5-flash"): Promise<AnalysisResult> => {
   if (!apiKey) throw new Error("API Key is required");
 
   // Initialize Gemini
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const model = genAI.getGenerativeModel({ model: modelName });
 
   const prompt = `
     You are an expert financial analyst. Analyze the following bank statement text and extract all transactions.
@@ -62,5 +62,43 @@ export const analyzeFinancialText = async (apiKey: string, text: string): Promis
     console.error("LLM Analysis Error:", error);
     // Propagate standard error message
     throw new Error(error.message || "Failed to analyze statement.");
+  }
+};
+
+export const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
+  if (!apiKey) return [];
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn("Failed to fetch models:", response.statusText);
+      return [];
+    }
+
+    const data = await response.json();
+    if (!data.models || !Array.isArray(data.models)) return [];
+
+    // Filter for models that support 'generateContent'
+    const textModels = data.models
+      .filter((m: any) => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m: any) => m.name.replace('models/', '')); // Remove 'models/' prefix if present for cleaner UI, SDK usually handles both but consistency is good.
+
+    // Sort: Put favored models first if present, otherwise alpha
+    const favored = ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+    textModels.sort((a: string, b: string) => {
+      const aIndex = favored.indexOf(a);
+      const bIndex = favored.indexOf(b);
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    return textModels;
+  } catch (error) {
+    console.error("Error fetching models:", error);
+    return [];
   }
 };

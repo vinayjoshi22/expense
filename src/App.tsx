@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Navbar, Container, Button, Row, Col, Collapse, ProgressBar, Form, InputGroup, Modal } from 'react-bootstrap';
+import { Navbar, Container, Button, Row, Col, Collapse, ProgressBar, Form, InputGroup, Modal, Dropdown } from 'react-bootstrap';
 import { FileDrop } from './components/dashboard/FileDrop';
 import { SummaryCards } from './components/dashboard/SummaryCards';
 import { ExpenseCharts } from './components/dashboard/ExpenseCharts';
 import { TransactionTable } from './components/dashboard/TransactionList';
 import { ErrorAlert } from './components/ui/ErrorAlert';
 import { parseFile } from './lib/parser';
-import { analyzeFinancialText } from './lib/llm';
+import { analyzeFinancialText, fetchAvailableModels } from './lib/llm';
 import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments } from './lib/storage';
 import type { Transaction, AppError, Investment } from './types';
 import { validateAppData, type AppData } from './lib/validator';
@@ -23,7 +23,22 @@ function App() {
   const [currency, setCurrency] = useState<string>(() => loadCurrency());
   const [isProcessing, setIsProcessing] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+  const [model, setModel] = useState(localStorage.getItem('EA_SELECTED_MODEL') || 'gemini-2.5-flash-lite');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [error, setError] = useState<AppError | null>(null);
+
+  // Load available models when API Key is set
+  useEffect(() => {
+    if (apiKey) {
+      fetchAvailableModels(apiKey).then(models => {
+        if (models.length > 0) {
+          setAvailableModels(models);
+          // If current selected model is NOT in list, revert to first available (safe default) or keep custom if legacy?
+          // Actually, let's just keep the user's choice unless it clearly fails, but the dropdown will show valid ones.
+        }
+      });
+    }
+  }, [apiKey]);
 
   // UI States
   const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -49,6 +64,10 @@ function App() {
   useEffect(() => {
     saveInvestments(investments);
   }, [investments]);
+
+  useEffect(() => {
+    localStorage.setItem('EA_SELECTED_MODEL', model);
+  }, [model]);
 
   // Investment Handlers
   const handleAddInvestment = (inv: Omit<Investment, 'id'>) => {
@@ -273,7 +292,7 @@ function App() {
       if (pdfFiles.length > 0) {
         for (const file of pdfFiles) {
           const text = await parseFile(file);
-          const result = await analyzeFinancialText(apiKey, text);
+          const result = await analyzeFinancialText(apiKey, text, model);
           newTransactions.push(...result.transactions);
           if (result.currency) detectedCurrency = result.currency;
         }
@@ -444,6 +463,24 @@ function App() {
               >
                 How this works?
               </Button>
+
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-light" size="sm" className="me-2 d-flex align-items-center gap-1">
+                  <span className="text-muted small">Model:</span> {model.replace('gemini-', '')}
+                </Dropdown.Toggle>
+                <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <Dropdown.Header>Select Parse Model</Dropdown.Header>
+                  {(availableModels.length > 0 ? availableModels : ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro']).map(m => (
+                    <Dropdown.Item key={m} onClick={() => setModel(m)} active={model === m}>
+                      {m}
+                      {m === 'gemini-2.5-flash-lite' && <small className="text-muted d-block">Default Lite</small>}
+                      {m === 'gemini-1.5-flash' && <small className="text-muted d-block">Fast & Efficient</small>}
+                      {m === 'gemini-2.0-flash-exp' && <small className="text-muted d-block">Experimental</small>}
+                    </Dropdown.Item>
+                  ))}
+                  {availableModels.length === 0 && <Dropdown.Item disabled><small>Loading or Check API Key...</small></Dropdown.Item>}
+                </Dropdown.Menu>
+              </Dropdown>
 
               <Button
                 variant={showKeyInput ? "secondary" : "outline-light"}

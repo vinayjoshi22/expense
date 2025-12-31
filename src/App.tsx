@@ -192,10 +192,10 @@ function App() {
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(t =>
-        t.description.toLowerCase().includes(lower) ||
-        t.category.toLowerCase().includes(lower) ||
-        t.amount.toString().includes(lower) ||
-        t.date.includes(lower)
+        (t.description || '').toLowerCase().includes(lower) ||
+        (t.category || '').toLowerCase().includes(lower) ||
+        (t.amount != null ? t.amount.toString() : '').includes(lower) ||
+        (t.date || '').includes(lower)
       );
     }
 

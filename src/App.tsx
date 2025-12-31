@@ -135,6 +135,12 @@ function App() {
     return result;
   }, [transactions, selectedYears, selectedMonths, searchTerm, categoryFilter]);
 
+  // Unique Categories for Filter Dropdown (Derived from FULL transaction list)
+  const allCategories = useMemo(() => {
+    const cats = new Set(transactions.map(t => t.category));
+    return ['All', ...Array.from(cats).sort()];
+  }, [transactions]);
+
   const handleFiles = async (files: File[]) => {
     // Check for JSON files first (bypass API key check for JSON-only imports)
     const jsonFiles = files.filter(f => f.name.endsWith('.json'));
@@ -490,6 +496,7 @@ function App() {
                   onSearchChange={setSearchTerm}
                   categoryFilter={categoryFilter}
                   onCategoryChange={setCategoryFilter}
+                  allCategories={allCategories}
                 />
               </Col>
             </Row>

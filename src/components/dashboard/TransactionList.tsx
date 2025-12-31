@@ -41,26 +41,22 @@ export function TransactionTable({
     searchTerm,
     onSearchChange,
     categoryFilter,
-    onCategoryChange
+    onCategoryChange,
+    allCategories
 }: TransactionTableProps & {
     searchTerm: string;
     onSearchChange: (val: string) => void;
     categoryFilter: string;
     onCategoryChange: (val: string) => void;
+    allCategories: string[];
 }) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
 
-    // Get Unique Categories for Filter
-    const categories = useMemo(() => {
-        const cats = new Set(transactions.map(t => t.category));
-        return ['All', ...Array.from(cats).sort()];
-    }, [transactions]);
-
+    // Categories for Editable Cell (Exclude 'All', ensuring 'Not an expense' is top)
     const uniqueCategoriesList = useMemo(() => {
-        const cats = new Set(transactions.map(t => t.category));
-        cats.delete('Not an expense');
-        return ['Not an expense', ...Array.from(cats).sort()];
-    }, [transactions]);
+        const cats = allCategories.filter(c => c !== 'All' && c !== 'Not an expense');
+        return ['Not an expense', ...cats];
+    }, [allCategories]);
 
     // Handle Sort Click
     const handleSort = (key: SortKey) => {
@@ -128,7 +124,7 @@ export function TransactionTable({
                                         value={categoryFilter}
                                         onChange={(e) => onCategoryChange(e.target.value)}
                                     >
-                                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                     </Form.Select>
                                 </InputGroup>
                             </Col>

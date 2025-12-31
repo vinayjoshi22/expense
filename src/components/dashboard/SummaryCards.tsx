@@ -1,15 +1,30 @@
-import { Card, Row, Col } from 'react-bootstrap';
+import { Card, Row, Col, Dropdown, Form, Button } from 'react-bootstrap';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Wallet, Filter } from 'lucide-react';
 
 interface SummaryCardsProps {
     income: number;
     expense: number;
     savings: number;
     currency: string;
+    allCategories: string[];
+    selectedCategories: Set<string>;
+    onToggleCategory: (cat: string) => void;
+    onSelectAll: () => void;
+    onDeselectAll: () => void;
 }
 
-export function SummaryCards({ income, expense, savings, currency }: SummaryCardsProps) {
+export function SummaryCards({
+    income,
+    expense,
+    savings,
+    currency,
+    allCategories,
+    selectedCategories,
+    onToggleCategory,
+    onSelectAll,
+    onDeselectAll
+}: SummaryCardsProps) {
     const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(1) : 0;
 
     return (
@@ -55,14 +70,43 @@ export function SummaryCards({ income, expense, savings, currency }: SummaryCard
                 <Card className="h-100 shadow-sm border-danger">
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                                <Card.Subtitle className="mb-2 text-danger fw-bold">EXPENSES</Card.Subtitle>
+                            <div className="flex-grow-1">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <Card.Subtitle className="text-danger fw-bold mb-0">EXPENSES</Card.Subtitle>
+                                    <Dropdown autoClose="outside">
+                                        <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-0 text-muted border-0 no-caret">
+                                            <Filter size={16} />
+                                        </Dropdown.Toggle>
+
+                                        <Dropdown.Menu className="p-3 shadow" style={{ minWidth: '250px', maxHeight: '300px', overflowY: 'auto' }}>
+                                            <div className="d-flex justify-content-between mb-2">
+                                                <small className="fw-bold text-muted">Filter Categories</small>
+                                                <div className="d-flex gap-2">
+                                                    <Button variant="link" size="sm" className="p-0 text-decoration-none" style={{ fontSize: '0.8rem' }} onClick={onSelectAll}>All</Button>
+                                                    <Button variant="link" size="sm" className="p-0 text-decoration-none" style={{ fontSize: '0.8rem' }} onClick={onDeselectAll}>None</Button>
+                                                </div>
+                                            </div>
+                                            <hr className="my-1" />
+                                            {allCategories.map(cat => (
+                                                <Form.Check
+                                                    key={cat}
+                                                    type="checkbox"
+                                                    id={`filter-${cat}`}
+                                                    label={cat}
+                                                    checked={selectedCategories.has(cat)}
+                                                    onChange={() => onToggleCategory(cat)}
+                                                    className="mb-1"
+                                                />
+                                            ))}
+                                        </Dropdown.Menu>
+                                    </Dropdown>
+                                </div>
                                 <h3 className="mb-0">{formatCurrency(expense, currency)}</h3>
                                 <small className="text-muted">
                                     {income > 0 ? (expense / income * 100).toFixed(1) : 0}% of Income
                                 </small>
                             </div>
-                            <div className="p-2 bg-danger bg-opacity-10 rounded">
+                            <div className="p-2 bg-danger bg-opacity-10 rounded ms-3">
                                 <ArrowDownRight className="text-danger" size={24} />
                             </div>
                         </div>

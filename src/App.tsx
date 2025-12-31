@@ -192,6 +192,33 @@ function App() {
     return ['All', ...Array.from(cats).sort()];
   }, [transactions]);
 
+  // Expense Card Filter State (Sync with allCategories initially)
+  const [expenseCardCategories, setExpenseCardCategories] = useState<Set<string>>(new Set());
+
+  // Init expense categories once we have data, if empty
+  useEffect(() => {
+    if (allCategories.length > 0 && expenseCardCategories.size === 0) {
+      // Initialize with all categories except 'All' and 'Not an expense' (though 'Not an expense' is usually handled separately)
+      // Actually, let's include everything found in transactions except 'Not an expense'
+      const cats = allCategories.filter(c => c !== 'All' && c !== 'Not an expense');
+      setExpenseCardCategories(new Set(cats));
+    }
+  }, [allCategories.length]);
+
+  const toggleExpenseCategory = (cat: string) => {
+    const next = new Set(expenseCardCategories);
+    if (next.has(cat)) next.delete(cat);
+    else next.add(cat);
+    setExpenseCardCategories(next);
+  };
+
+  const selectAllExpenseCategories = () => {
+    const cats = allCategories.filter(c => c !== 'All' && c !== 'Not an expense');
+    setExpenseCardCategories(new Set(cats));
+  };
+
+  const deselectAllExpenseCategories = () => setExpenseCardCategories(new Set());
+
   const handleFiles = async (files: File[]) => {
     // Check for JSON files first (bypass API key check for JSON-only imports)
     const jsonFiles = files.filter(f => f.name.endsWith('.json'));
@@ -364,8 +391,19 @@ function App() {
 
   // Calculations (Use filteredTransactions)
   const totalIncome = filteredTransactions.filter((t: Transaction) => t.type === 'credit').reduce((a: number, b: Transaction) => a + b.amount, 0);
-  const totalExpense = filteredTransactions.filter((t: Transaction) => t.type === 'debit' && t.category !== 'Not an expense').reduce((a: number, b: Transaction) => a + b.amount, 0);
-  const totalSavings = totalIncome - totalExpense;
+
+  // Standard Expense (Used for Charts - All categories) -> Logic resides in charts/table components directly via filteredTransactions
+
+
+  // Custom Expense (Used for Summary Card - Filtered by Expense Card Dropdown)
+  const totalExpenseCustom = filteredTransactions
+    .filter((t: Transaction) => t.type === 'debit' && t.category !== 'Not an expense' && expenseCardCategories.has(t.category))
+    .reduce((a: number, b: Transaction) => a + b.amount, 0);
+
+  const totalSavings = totalIncome - totalExpenseCustom; // Net savings should probably reflect the "view" the user has chosen for expenses?
+  // User asked: "Only selected category transactions should be included for computing expense... only total expense number should change".
+  // This implies Net Savings should also update, otherwise `Income - Expense != Savings` which confuses users.
+  // I will use `totalExpenseCustom` for Savings calculation too to maintain consistency in the top row.
 
   return (
     <div className="min-vh-100 d-flex flex-column">
@@ -524,7 +562,17 @@ function App() {
             />
 
             {/* Dashboard */}
-            <SummaryCards income={totalIncome} expense={totalExpense} savings={totalSavings} currency={currency} />
+            <SummaryCards
+              income={totalIncome}
+              expense={totalExpenseCustom}
+              savings={totalSavings}
+              currency={currency}
+              allCategories={allCategories.filter(c => c !== 'All' && c !== 'Not an expense')}
+              selectedCategories={expenseCardCategories}
+              onToggleCategory={toggleExpenseCategory}
+              onSelectAll={selectAllExpenseCategories}
+              onDeselectAll={deselectAllExpenseCategories}
+            />
 
             <Row className="g-3">
               <Col lg={12}>

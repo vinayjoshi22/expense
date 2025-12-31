@@ -20,6 +20,7 @@ export function FileDrop({ onFilesSelected, isProcessing }: FileDropProps) {
         accept: {
             'application/pdf': ['.pdf'],
             'text/plain': ['.txt', '.csv'],
+            'application/json': ['.json'],
         },
         disabled: isProcessing,
     });
@@ -43,7 +44,7 @@ export function FileDrop({ onFilesSelected, isProcessing }: FileDropProps) {
                         <Upload size={32} />
                     </div>
                     <h5 className="mb-2">Drag & drop bank statement</h5>
-                    <p className="text-muted small mb-0">PDF or Text files supported</p>
+                    <p className="text-muted small mb-0">PDF, JSON, or Text files supported</p>
                 </div>
             )}
         </div>

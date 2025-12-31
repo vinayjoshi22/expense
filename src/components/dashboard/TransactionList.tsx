@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Card, Table, Badge, Form, InputGroup, OverlayTrigger, Tooltip, Row, Col } from 'react-bootstrap';
+import { Card, Table, Badge, Form, InputGroup, Row, Col } from 'react-bootstrap';
 import type { Transaction } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter } from 'lucide-react';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
+import { EditableCell } from '../ui/EditableCell';
 
 interface TransactionTableProps {
     transactions: Transaction[];
     currency: string;
-    onUpdateCategory: (id: string, newCategory: string) => void;
+    onUpdateTransaction: (id: string, field: keyof Transaction, value: any) => void;
 }
 
 const getBadgeVariant = (category: string) => {
@@ -20,6 +21,7 @@ const getBadgeVariant = (category: string) => {
         case 'Health': return 'danger';
         case 'Utilities': return 'dark';
         case 'Income': return 'success';
+        case 'Not an expense': return 'light';
         default: return 'secondary';
     }
 }
@@ -32,9 +34,20 @@ interface SortConfig {
     direction: SortDirection;
 }
 
-export function TransactionTable({ transactions, currency, onUpdateCategory }: TransactionTableProps) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState<string>('All');
+export function TransactionTable({
+    transactions,
+    currency,
+    onUpdateTransaction,
+    searchTerm,
+    onSearchChange,
+    categoryFilter,
+    onCategoryChange
+}: TransactionTableProps & {
+    searchTerm: string;
+    onSearchChange: (val: string) => void;
+    categoryFilter: string;
+    onCategoryChange: (val: string) => void;
+}) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
 
     // Get Unique Categories for Filter
@@ -45,7 +58,8 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
 
     const uniqueCategoriesList = useMemo(() => {
         const cats = new Set(transactions.map(t => t.category));
-        return Array.from(cats).sort();
+        cats.delete('Not an expense');
+        return ['Not an expense', ...Array.from(cats).sort()];
     }, [transactions]);
 
     // Handle Sort Click
@@ -61,18 +75,9 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
         return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="ms-1" /> : <ArrowDown size={14} className="ms-1" />;
     };
 
-    // Filter and Sort Logic
-    const filteredAndSortedTransactions = useMemo(() => {
+    // Sort Logic (Filtering passed from parent)
+    const sortedTransactions = useMemo(() => {
         let result = [...transactions];
-
-        // Filter
-        if (searchTerm) {
-            const lower = searchTerm.toLowerCase();
-            result = result.filter(t => t.description.toLowerCase().includes(lower));
-        }
-        if (categoryFilter !== 'All') {
-            result = result.filter(t => t.category === categoryFilter);
-        }
 
         // Sort
         result.sort((a, b) => {
@@ -90,7 +95,7 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
         });
 
         return result;
-    }, [transactions, searchTerm, categoryFilter, sortConfig]);
+    }, [transactions, sortConfig]);
 
     return (
         <Card className="shadow-sm">
@@ -99,7 +104,7 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
                     <Col md={4}>
                         <h5 className="mb-0 fw-bold text-secondary d-flex align-items-center gap-2">
                             Transactions
-                            <Badge bg="secondary" pill className="fs-6">{filteredAndSortedTransactions.length}</Badge>
+                            <Badge bg="secondary" pill className="fs-6">{sortedTransactions.length}</Badge>
                         </h5>
                     </Col>
                     <Col md={8}>
@@ -108,10 +113,10 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
                                 <InputGroup size="sm">
                                     <InputGroup.Text className="bg-light border-end-0"><Search size={14} /></InputGroup.Text>
                                     <Form.Control
-                                        placeholder="Search description..."
+                                        placeholder="Search transactions..."
                                         className="border-start-0 bg-light"
                                         value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        onChange={(e) => onSearchChange(e.target.value)}
                                     />
                                 </InputGroup>
                             </Col>
@@ -121,7 +126,7 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
                                     <Form.Select
                                         className="border-start-0 bg-light"
                                         value={categoryFilter}
-                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        onChange={(e) => onCategoryChange(e.target.value)}
                                     >
                                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                     </Form.Select>
@@ -151,34 +156,46 @@ export function TransactionTable({ transactions, currency, onUpdateCategory }: T
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredAndSortedTransactions.map((t) => (
+                        {sortedTransactions.map((t) => (
                             <tr key={t.id}>
-                                <td className="ps-3 text-secondary font-monospace" style={{ fontSize: '0.9em' }}>{formatDate(t.date)}</td>
+                                <td className="ps-3 text-secondary font-monospace" style={{ fontSize: '0.9em' }}>
+                                    <EditableCell
+                                        value={t.date}
+                                        type="date"
+                                        onSave={(val) => onUpdateTransaction(t.id, 'date', val)}
+                                        format={(val) => formatDate(val)}
+                                    />
+                                </td>
                                 <td className="fw-500 text-dark">
-                                    <OverlayTrigger
-                                        placement="top"
-                                        delay={{ show: 250, hide: 400 }}
-                                        overlay={<Tooltip id={`tooltip-${t.id}`}>{t.description}</Tooltip>}
-                                    >
-                                        <div className="text-truncate" style={{ maxWidth: '250px', cursor: 'help' }}>{t.description}</div>
-                                    </OverlayTrigger>
+                                    <EditableCell
+                                        value={t.description}
+                                        type="text"
+                                        onSave={(val) => onUpdateTransaction(t.id, 'description', val)}
+                                    />
                                 </td>
                                 <td>
                                     <EditableCategoryCell
                                         id={t.id}
                                         value={t.category}
                                         allOptions={uniqueCategoriesList}
-                                        onUpdate={onUpdateCategory}
+                                        onUpdate={(id, val) => onUpdateTransaction(id, 'category', val)}
                                         variantMapper={getBadgeVariant}
                                     />
                                 </td>
                                 <td className={`text-end pe-3 fw-bold font-monospace ${t.type === 'credit' ? 'text-success' : 'text-dark'}`}>
-                                    {t.type === 'credit' && <ArrowUpRight size={14} className="me-1" />}
-                                    {formatCurrency(t.amount, currency)}
+                                    <div className="d-flex justify-content-end align-items-center gap-1">
+                                        {t.type === 'credit' && <ArrowUpRight size={14} className="me-1" />}
+                                        <EditableCell
+                                            value={t.amount}
+                                            type="number"
+                                            onSave={(val) => onUpdateTransaction(t.id, 'amount', val)}
+                                            format={(val) => formatCurrency(val, currency)}
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         ))}
-                        {filteredAndSortedTransactions.length === 0 && (
+                        {sortedTransactions.length === 0 && (
                             <tr>
                                 <td colSpan={4} className="text-center py-5 text-muted">
                                     No transactions found matching your filters.

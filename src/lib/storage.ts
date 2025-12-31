@@ -86,3 +86,24 @@ export const mergeTransactions = (existing: Transaction[], incoming: Transaction
         new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 };
+
+export const mergeInvestments = (existing: any[], incoming: any[]): any[] => {
+    const map = new Map<string, any>();
+
+    // 1. Load existing
+    existing.forEach(i => {
+        if (i.id) map.set(i.id, i);
+    });
+
+    // 2. Merge incoming (avoid duplicates by ID)
+    let newCount = 0;
+    incoming.forEach(i => {
+        if (i.id && !map.has(i.id)) {
+            map.set(i.id, i);
+            newCount++;
+        }
+    });
+
+    console.log(`Merged ${incoming.length} incoming investments. Added ${newCount} new unique records.`);
+    return Array.from(map.values());
+};

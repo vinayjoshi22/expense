@@ -5,6 +5,7 @@ import type { Investment } from '../../types';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { EditableCell } from '../ui/EditableCell';
 
 interface InvestmentListProps {
     investments: Investment[];
@@ -130,8 +131,21 @@ export function InvestmentList({ investments, currency, onAdd, onUpdate, onDelet
                         <tbody>
                             {investments.map(inv => (
                                 <tr key={inv.id}>
-                                    <td className="ps-3 text-secondary font-monospace">{formatDate(inv.date)}</td>
-                                    <td className="fw-500">{inv.name}</td>
+                                    <td className="ps-3 text-secondary font-monospace">
+                                        <EditableCell
+                                            value={inv.date}
+                                            type="date"
+                                            onSave={(val) => onUpdate(inv.id, 'date', val)}
+                                            format={(val) => formatDate(val)}
+                                        />
+                                    </td>
+                                    <td className="fw-500">
+                                        <EditableCell
+                                            value={inv.name}
+                                            type="text"
+                                            onSave={(val) => onUpdate(inv.id, 'name', val)}
+                                        />
+                                    </td>
                                     <td>
                                         <EditableCategoryCell
                                             id={inv.id}
@@ -142,7 +156,14 @@ export function InvestmentList({ investments, currency, onAdd, onUpdate, onDelet
                                         />
                                     </td>
                                     <td className="text-end pe-3 fw-bold font-monospace text-success">
-                                        {formatCurrency(inv.amount, inv.currency)}
+                                        <div className="d-flex justify-content-end">
+                                            <EditableCell
+                                                value={inv.amount}
+                                                type="number"
+                                                onSave={(val) => onUpdate(inv.id, 'amount', val)}
+                                                format={(val) => formatCurrency(val, inv.currency)}
+                                            />
+                                        </div>
                                     </td>
                                     <td className="text-end pe-3">
                                         <Button variant="link" className="text-danger p-0" size="sm" onClick={() => onDelete(inv.id)}>

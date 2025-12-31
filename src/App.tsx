@@ -7,13 +7,15 @@ import { TransactionTable } from './components/dashboard/TransactionList';
 import { ErrorAlert } from './components/ui/ErrorAlert';
 import { parseFile } from './lib/parser';
 import { analyzeFinancialText } from './lib/llm';
-import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments } from './lib/storage';
+import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments } from './lib/storage';
 import type { Transaction, AppError, Investment } from './types';
-import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
+import { validateAppData, type AppData } from './lib/validator';
+import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
 import { DashboardControls } from './components/dashboard/DashboardControls';
 import { HowItWorksModal } from './components/ui/HowItWorksModal';
 import { InvestmentList } from './components/dashboard/InvestmentList';
+import { BulkCategoryModal } from './components/dashboard/BulkCategoryModal';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
@@ -29,7 +31,11 @@ function App() {
   const [showKeyInput, setShowKeyInput] = useState(!apiKey);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Filter States
+  // Search & Filter States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // Filter States (Date)
   const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
 
@@ -102,17 +108,40 @@ function App() {
 
   // Filter Data
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    let result = transactions.filter(t => {
       const date = new Date(t.date);
       const year = date.getFullYear().toString();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       return selectedYears.has(year) && selectedMonths.has(month);
     });
-  }, [transactions, selectedYears, selectedMonths]);
+
+    // Search Filter
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(t =>
+        t.description.toLowerCase().includes(lower) ||
+        t.category.toLowerCase().includes(lower) ||
+        t.amount.toString().includes(lower) ||
+        t.date.includes(lower)
+      );
+    }
+
+    // Category Filter
+    if (categoryFilter !== 'All') {
+      result = result.filter(t => t.category === categoryFilter);
+    }
+
+    // Sort logic remains in Table for display, but filtering happens here for data consistency
+    return result;
+  }, [transactions, selectedYears, selectedMonths, searchTerm, categoryFilter]);
 
   const handleFiles = async (files: File[]) => {
-    if (!apiKey) {
-      setError({ title: "API Key Required", message: "Please provide your Gemini API Key." });
+    // Check for JSON files first (bypass API key check for JSON-only imports)
+    const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+    const pdfFiles = files.filter(f => !f.name.endsWith('.json'));
+
+    if (pdfFiles.length > 0 && !apiKey) {
+      setError({ title: "API Key Required", message: "Please provide your Gemini API Key for PDF analysis." });
       setShowKeyInput(true);
       return;
     }
@@ -123,24 +152,64 @@ function App() {
     try {
       const newTransactions: Transaction[] = [];
       let detectedCurrency = currency;
+      let newInvestments: Investment[] = [];
 
-      for (const file of files) {
-        const text = await parseFile(file);
-        const result = await analyzeFinancialText(apiKey, text);
-        newTransactions.push(...result.transactions);
-        if (result.currency) detectedCurrency = result.currency;
+      // Process JSON Files
+      for (const file of jsonFiles) {
+        const text = await file.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error(`Invalid JSON in file: ${file.name}`);
+        }
+
+        if (validateAppData(data)) {
+          newTransactions.push(...data.transactions);
+          if (data.investments) newInvestments.push(...data.investments);
+          if (data.currency) detectedCurrency = data.currency;
+        }
+      }
+
+      // Process PDF Files
+      if (pdfFiles.length > 0) {
+        for (const file of pdfFiles) {
+          const text = await parseFile(file);
+          const result = await analyzeFinancialText(apiKey, text);
+          newTransactions.push(...result.transactions);
+          if (result.currency) detectedCurrency = result.currency;
+        }
       }
 
       setTransactions(prev => mergeTransactions(prev, newTransactions));
+      setInvestments(prev => mergeInvestments(prev, newInvestments));
       setCurrency(detectedCurrency);
       setShowUpload(false);
 
     } catch (err: any) {
       console.error(err);
-      setError({ title: "Analysis Failed", message: err.message });
+      setError({ title: "Import Failed", message: err.message });
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleExport = () => {
+    const data: AppData = {
+      transactions,
+      investments,
+      currency,
+      version: 1
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expense-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const clearData = () => {
@@ -161,22 +230,88 @@ function App() {
     // Don't auto-close, let user decide when done or if they want to edit
   };
 
-  // Update Transaction Category
-  const handleUpdateCategory = (id: string, newCategory: string) => {
+  // Bulk Modal State
+  const [bulkModal, setBulkModal] = useState<{
+    show: boolean;
+    transaction: Transaction | null;
+    newCategory: string;
+    matchCountFiltered: number;
+    matchCountAll: number;
+  }>({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
+
+  // Update Transaction Helper
+  const updateSingleTransaction = (id: string, field: keyof Transaction, value: any) => {
     setTransactions(prev => prev.map(t =>
-      t.id === id ? { ...t, category: newCategory } : t
+      t.id === id ? { ...t, [field]: value } : t
     ));
-    // Persistence handled by useEffect
+  };
+
+  // Update Transaction Field
+  const handleUpdateTransaction = (id: string, field: keyof Transaction, value: any) => {
+    // If updating category, check for bulk update matches
+    if (field === 'category') {
+      const targetTx = transactions.find(t => t.id === id);
+      if (targetTx) {
+        const safeDesc = targetTx.description.trim();
+        const matchesAll = transactions.filter(t => t.description.trim() === safeDesc && t.id !== id).length;
+
+        // Recalculate filtered matches based on current filters logic
+        // We use filteredTransactions directly as it reflects current UI state
+        const matchesFiltered = filteredTransactions.filter(t => t.description.trim() === safeDesc && t.id !== id).length;
+
+        if (matchesAll > 0) {
+          setBulkModal({
+            show: true,
+            transaction: targetTx,
+            newCategory: value,
+            matchCountFiltered: matchesFiltered + 1, // +1 for self
+            matchCountAll: matchesAll + 1 // +1 for self
+          });
+          return; // Wait for user decision
+        }
+      }
+    }
+
+    // Default: Single update
+    updateSingleTransaction(id, field, value);
+  };
+
+  const cleanBulkModal = () => setBulkModal({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
+
+  const confirmBulkUpdate = (mode: 'single' | 'filtered' | 'all') => {
+    if (!bulkModal.transaction) return;
+
+    const targetDesc = bulkModal.transaction.description.trim();
+    const newVal = bulkModal.newCategory;
+    const targetId = bulkModal.transaction.id;
+
+    if (mode === 'single') {
+      updateSingleTransaction(targetId, 'category', newVal);
+    } else if (mode === 'all') {
+      setTransactions(prev => prev.map(t =>
+        (t.description.trim() === targetDesc || t.id === targetId)
+          ? { ...t, category: newVal }
+          : t
+      ));
+    } else if (mode === 'filtered') {
+      // Update only those in filteredTransactions AND matching description
+      const visibleIds = new Set(filteredTransactions.map(t => t.id));
+      setTransactions(prev => prev.map(t =>
+        ((visibleIds.has(t.id) && t.description.trim() === targetDesc) || t.id === targetId)
+          ? { ...t, category: newVal }
+          : t
+      ));
+    }
+    cleanBulkModal();
   };
 
   // Calculations (Use filteredTransactions)
   const totalIncome = filteredTransactions.filter((t: Transaction) => t.type === 'credit').reduce((a: number, b: Transaction) => a + b.amount, 0);
-  const totalExpense = filteredTransactions.filter((t: Transaction) => t.type === 'debit').reduce((a: number, b: Transaction) => a + b.amount, 0);
+  const totalExpense = filteredTransactions.filter((t: Transaction) => t.type === 'debit' && t.category !== 'Not an expense').reduce((a: number, b: Transaction) => a + b.amount, 0);
   const totalSavings = totalIncome - totalExpense;
 
   return (
     <div className="min-vh-100 d-flex flex-column">
-      {/* Navbar */}
       {/* Navbar */}
       <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm py-2 sticky-top">
         <Container fluid>
@@ -227,6 +362,9 @@ function App() {
                   </Button>
                 </>
               )}
+              <Button variant="outline-light" size="sm" onClick={handleExport} title="Export Data">
+                <Download size={16} />
+              </Button>
             </div>
           </Navbar.Collapse>
         </Container>
@@ -340,17 +478,37 @@ function App() {
                   onUpdate={handleUpdateInvestment}
                   onDelete={handleDeleteInvestment}
                 />
-                <ExpenseCharts transactions={filteredTransactions} currency={currency} />
-                <TransactionTable
-                  transactions={filteredTransactions}
+                <ExpenseCharts
+                  transactions={filteredTransactions.filter(t => t.category !== 'Not an expense')}
                   currency={currency}
-                  onUpdateCategory={handleUpdateCategory}
+                />
+                <TransactionTable
+                  transactions={filteredTransactions} // Now fully filtered
+                  currency={currency}
+                  onUpdateTransaction={handleUpdateTransaction}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  categoryFilter={categoryFilter}
+                  onCategoryChange={setCategoryFilter}
                 />
               </Col>
             </Row>
           </>
         )}
       </Container>
+
+      {/* Bulk Update Modal */}
+      <BulkCategoryModal
+        show={bulkModal.show}
+        onHide={cleanBulkModal}
+        currentTransactionDescription={bulkModal.transaction?.description || ''}
+        newCategory={bulkModal.newCategory}
+        onUpdateSingle={() => confirmBulkUpdate('single')}
+        onUpdateFiltered={() => confirmBulkUpdate('filtered')}
+        onUpdateAll={() => confirmBulkUpdate('all')}
+        matchCountFiltered={bulkModal.matchCountFiltered}
+        matchCountAll={bulkModal.matchCountAll}
+      />
     </div>
   );
 }

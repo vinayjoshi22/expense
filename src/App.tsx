@@ -192,32 +192,46 @@ function App() {
     return ['All', ...Array.from(cats).sort()];
   }, [transactions]);
 
-  // Expense Card Filter State (Sync with allCategories initially)
-  const [expenseCardCategories, setExpenseCardCategories] = useState<Set<string>>(new Set());
-
-  // Init expense categories once we have data, if empty
-  useEffect(() => {
-    if (allCategories.length > 0 && expenseCardCategories.size === 0) {
-      // Initialize with all categories except 'All' and 'Not an expense' (though 'Not an expense' is usually handled separately)
-      // Actually, let's include everything found in transactions except 'Not an expense'
-      const cats = allCategories.filter(c => c !== 'All' && c !== 'Not an expense');
-      setExpenseCardCategories(new Set(cats));
+  // Expense Card Filter Persistence (Store EXCLUDED categories to handle new ones automatically)
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('EA_EXPENSE_FILTER_EXCLUDED');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
     }
-  }, [allCategories.length]);
+  });
+
+  // Save excluded categories
+  useEffect(() => {
+    localStorage.setItem('EA_EXPENSE_FILTER_EXCLUDED', JSON.stringify(Array.from(excludedCategories)));
+  }, [excludedCategories]);
+
+  // Derived "Selected" categories for UI and Logic
+  const expenseCardCategories = useMemo(() => {
+    const included = new Set<string>();
+    allCategories.forEach(cat => {
+      if (cat !== 'All' && cat !== 'Not an expense' && cat !== 'Income' && !excludedCategories.has(cat)) {
+        included.add(cat);
+      }
+    });
+    return included;
+  }, [allCategories, excludedCategories]);
 
   const toggleExpenseCategory = (cat: string) => {
-    const next = new Set(expenseCardCategories);
-    if (next.has(cat)) next.delete(cat);
-    else next.add(cat);
-    setExpenseCardCategories(next);
+    const next = new Set(excludedCategories);
+    if (next.has(cat)) next.delete(cat); // If excluded, un-exclude (include)
+    else next.add(cat); // If included, exclude
+    setExcludedCategories(next);
   };
 
-  const selectAllExpenseCategories = () => {
-    const cats = allCategories.filter(c => c !== 'All' && c !== 'Not an expense');
-    setExpenseCardCategories(new Set(cats));
-  };
+  const selectAllExpenseCategories = () => setExcludedCategories(new Set()); // Clear exclusions
 
-  const deselectAllExpenseCategories = () => setExpenseCardCategories(new Set());
+  const deselectAllExpenseCategories = () => {
+    // Exclude ALL valid categories
+    const allValid = allCategories.filter(c => c !== 'All' && c !== 'Not an expense' && c !== 'Income');
+    setExcludedCategories(new Set(allValid));
+  };
 
   const handleFiles = async (files: File[]) => {
     // Check for JSON files first (bypass API key check for JSON-only imports)
@@ -567,7 +581,7 @@ function App() {
               expense={totalExpenseCustom}
               savings={totalSavings}
               currency={currency}
-              allCategories={allCategories.filter(c => c !== 'All' && c !== 'Not an expense')}
+              allCategories={allCategories.filter(c => c !== 'All' && c !== 'Not an expense' && c !== 'Income')}
               selectedCategories={expenseCardCategories}
               onToggleCategory={toggleExpenseCategory}
               onSelectAll={selectAllExpenseCategories}

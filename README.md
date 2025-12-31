@@ -1,73 +1,45 @@
-# React + TypeScript + Vite
+# Expense Analyzer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An intelligent, privacy-focused financial dashboard that runs entirely in your browser. Upload your bank statements, review extracted data, and gain instant insights into your spending and investments.
 
-Currently, two official plugins are available:
+## 🚀 How It Works
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### **1. Local-First Architecture**
+This application is designed with privacy as the core principle.
+- **No Backend**: The app runs 100% on your device.
+- **Private Data**: Your files and financial data are never uploaded to our servers.
+- **Secure Persistence**: Data is stored in your browser's `localStorage` and persists between sessions.
 
-## React Compiler
+### **2. AI-Powered Parsing**
+We use Google's **Gemini API** to intelligently parse your PDFs and statements.
+- **Smart Extraction**: Automatically identifies dates, descriptions, categories, and amounts.
+- **Review Loop**: Before saving, you see a preview of the extracted data. You can refine the AI's results with natural language feedback (e.g., "The date format is DD/MM/YYYY") to get perfect accuracy.
+- **Model Selection**: Choose which Gemini model powers your analysis (Flash for speed, Pro for reasoning).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ✨ Key Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### **📊 Smart Dashboard**
+- **Interactive Charts**: Visualize spending by category and net savings over time.
+- **Investment Portfolio**: Track stocks, funds, and assets alongside your expenses.
+- **Global Search**: Instantly filter transactions by any field.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### **⚡ Intelligent Workflow**
+- **Review Modal**: Inspect and approve AI-extracted data before it enters your dashboard.
+- **Bulk Updates**: Rename a category once (e.g., "Uber" -> "Transport") and automatically update all matching transactions.
+- **Exclusion Logic**: Mark items as "Not an expense" (like credit card payments) to exclude them from totals.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### **🛡️ Data Control**
+- **Export & Backup**: Download your entire financial history as a JSON file.
+- **Granular Deletion**: Clear specific data—like just your investments, or transactions from a specific month—without wiping your whole app.
+- **API Privacy**: Use your own Google AI Studio key to ensure your data is processed privately and not used for model training.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🛠️ Getting Started
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1.  **Set API Key**: Enter your Gemini API Key in the top bar. (Get one for free from Google AI Studio).
+2.  **Upload Files**: Drag & drop PDF statements or JSON backups.
+3.  **Review**: Verify the extracted transactions in the popup modal.
+4.  **Explore**: Use the dashboard to analyze your financial health.

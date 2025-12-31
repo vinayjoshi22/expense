@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Navbar, Container, Button, Row, Col, Collapse, ProgressBar, Form, InputGroup, Modal, Dropdown } from 'react-bootstrap';
+import { Navbar, Container, Button, Row, Col, Collapse, Form, InputGroup, Modal, Dropdown } from 'react-bootstrap';
 import { FileDrop } from './components/dashboard/FileDrop';
 import { SummaryCards } from './components/dashboard/SummaryCards';
 import { ExpenseCharts } from './components/dashboard/ExpenseCharts';
@@ -18,12 +18,13 @@ import { InvestmentList } from './components/dashboard/InvestmentList';
 import { BulkCategoryModal } from './components/dashboard/BulkCategoryModal';
 import { ReviewModal } from './components/dashboard/ReviewModal';
 import { ClearDataModal } from './components/dashboard/ClearDataModal';
+import { ProcessingOverlay, type ProcessingStatus } from './components/ui/ProcessingOverlay';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
   const [investments, setInvestments] = useState<Investment[]>(() => loadInvestments());
   const [currency, setCurrency] = useState<string>(() => loadCurrency());
-  const [isProcessing, setIsProcessing] = useState(false);
+  /* isProcessing replaced by processingStatus.isActive */
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [model, setModel] = useState(localStorage.getItem('EA_SELECTED_MODEL') || 'gemini-2.5-flash-lite');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -253,6 +254,14 @@ function App() {
     setExcludedCategories(new Set(allValid));
   };
 
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
+    isActive: false,
+    currentBatch: 0,
+    totalBatches: 0,
+    completedBatches: [],
+    startTime: 0
+  });
+
   const handleFiles = async (files: File[]) => {
     // Check for JSON files first (bypass API key check for JSON-only imports)
     const jsonFiles = files.filter(f => f.name.endsWith('.json'));
@@ -264,17 +273,22 @@ function App() {
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingStatus({
+      isActive: true,
+      currentBatch: 0,
+      totalBatches: 0, // Will update once we know chunks
+      completedBatches: [],
+      startTime: Date.now()
+    });
     setError(null);
 
     try {
       const newTransactions: Transaction[] = [];
       let detectedCurrency = currency;
       let newInvestments: Investment[] = [];
+      const rawTexts: string[] = [];
 
-      const rawTexts: string[] = []; // Store raw text for refinement
-
-      // Process JSON Files (No LLM, direct import - skip review? Or review too? User asked for "intermediate step between file upload + LLM parsing", usually imports are trusted. Let's trust JSON for now or just merge them? Spec says "User will review the transactions...". Let's show JSON results in review too for consistency if requested, but LLM parsing flow is the main target. I'll include JSON results in the review preview so they can confirm before merging.)
+      // Process JSON Files (No LLM, direct import - skip review? Or review too? User asked for "intermediate step between file upload + LLM parsing", usually imports are trusted. Let's trust JSON for now or just merge them? Spec says "User will review the transactions...". Let's show JSON results in the review preview so they can confirm before merging.)
       for (const file of jsonFiles) {
         const text = await file.text();
         let data;
@@ -293,12 +307,31 @@ function App() {
 
       // Process PDF Files
       if (pdfFiles.length > 0) {
+        // First, get all chunks to know total batches
+        let allChunks: string[] = [];
         for (const file of pdfFiles) {
-          const text = await parseFile(file);
-          rawTexts.push(text); // Save for redo
-          const result = await analyzeFinancialText(apiKey, text, model);
+          const chunks = await parseFile(file);
+          allChunks.push(...chunks);
+        }
+        rawTexts.push(...allChunks);
+
+        // Update total batches
+        setProcessingStatus(prev => ({ ...prev, totalBatches: allChunks.length, currentBatch: 1 }));
+
+        // Process sequentially
+        for (let i = 0; i < allChunks.length; i++) {
+          const batchStart = Date.now();
+          setProcessingStatus(prev => ({ ...prev, currentBatch: i + 1 }));
+
+          const result = await analyzeFinancialText(apiKey, allChunks[i], model);
           newTransactions.push(...result.transactions);
           if (result.currency) detectedCurrency = result.currency;
+
+          // Log completion
+          setProcessingStatus(prev => ({
+            ...prev,
+            completedBatches: [...prev.completedBatches, { batchNum: i + 1, timeMs: Date.now() - batchStart }]
+          }));
         }
       }
 
@@ -319,7 +352,7 @@ function App() {
       console.error(err);
       setError({ title: "Import Failed", message: err.message });
     } finally {
-      setIsProcessing(false);
+      setProcessingStatus(prev => ({ ...prev, isActive: false }));
     }
   };
 
@@ -464,22 +497,38 @@ function App() {
   // Redo Analysis with Feedback
   const handleReviewRedo = async (feedback: string) => {
     if (!reviewData) return;
-    setIsProcessing(true);
+
+    setProcessingStatus({
+      isActive: true,
+      currentBatch: 1,
+      totalBatches: reviewData.rawTexts.length,
+      completedBatches: [],
+      startTime: Date.now()
+    });
+
     try {
       const newTransactions: Transaction[] = [];
-      // Re-process all raw texts with feedback
-      for (const text of reviewData.rawTexts) {
-        const result = await analyzeFinancialText(apiKey, text, model, feedback);
+      const chunks = reviewData.rawTexts;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const batchStart = Date.now();
+        setProcessingStatus(prev => ({ ...prev, currentBatch: i + 1 }));
+
+        const result = await analyzeFinancialText(apiKey, chunks[i], model, feedback);
         newTransactions.push(...result.transactions);
+
+        setProcessingStatus(prev => ({
+          ...prev,
+          completedBatches: [...prev.completedBatches, { batchNum: i + 1, timeMs: Date.now() - batchStart }]
+        }));
       }
 
-      // Update review data with new results
       setReviewData(prev => prev ? { ...prev, transactions: newTransactions } : null);
     } catch (err: any) {
       console.error(err);
       setError({ title: "Refinement Failed", message: err.message });
     } finally {
-      setIsProcessing(false);
+      setProcessingStatus(prev => ({ ...prev, isActive: false }));
     }
   };
 
@@ -650,7 +699,7 @@ function App() {
               <h1 className="display-4 fw-bold mb-3">Financial Clarity</h1>
               <p className="lead text-muted mb-5">Upload your bank statements to get started.</p>
 
-              <FileDrop onFilesSelected={handleFiles} isProcessing={isProcessing} />
+              <FileDrop onFilesSelected={handleFiles} isProcessing={processingStatus.isActive} />
             </Col>
           </Row>
         ) : (
@@ -663,8 +712,7 @@ function App() {
                     <h6 className="fw-bold text-primary">Add More Statements</h6>
                     <Button variant="close" size="sm" onClick={() => setShowUpload(false)} />
                   </div>
-                  <FileDrop onFilesSelected={handleFiles} isProcessing={isProcessing} />
-                  {isProcessing && <ProgressBar animated now={100} label="Processing..." className="mt-3" />}
+                  <FileDrop onFilesSelected={handleFiles} isProcessing={processingStatus.isActive} />
                 </div>
               </div>
             </Collapse>
@@ -747,11 +795,18 @@ function App() {
         onHide={handleReviewCancel} // Clicking backdrop cancels (or we can enforce specific button, user said "Cancel then ... permanently")
         transactions={reviewData?.transactions || []}
         currency={reviewData?.detectedCurrency || currency}
-        isProcessing={isProcessing}
+        processingStatus={processingStatus} // New Prop
         onApprove={handleReviewApprove}
         onCancel={handleReviewCancel}
         onRedo={handleReviewRedo}
       />
+
+      {/* Global Processing Overlay (for initial file load) */}
+      <Modal show={processingStatus.isActive && !showReviewModal} centered backdrop="static" keyboard={false}>
+        <Modal.Body className="p-0">
+          <ProcessingOverlay status={processingStatus} />
+        </Modal.Body>
+      </Modal>
 
       {/* Transaction Delete Warning Modal */}
       <Modal show={showTxDeleteConfirm} onHide={() => setShowTxDeleteConfirm(false)} centered>

@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Modal, Button, Table, Form, Badge, ProgressBar } from 'react-bootstrap';
+import { Modal, Button, Table, Form, Badge, Alert } from 'react-bootstrap';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import type { Transaction } from '../../types';
 import { RefreshCw, Check, X } from 'lucide-react';
+import { ProcessingOverlay, type ProcessingStatus } from '../ui/ProcessingOverlay';
 
 interface ReviewModalProps {
     show: boolean;
     onHide: () => void;
     transactions: Transaction[];
     currency: string;
-    isProcessing: boolean;
+    processingStatus: ProcessingStatus;
     onApprove: () => void;
     onCancel: () => void;
     onRedo: (feedback: string) => void;
@@ -20,7 +21,7 @@ export function ReviewModal({
     onHide,
     transactions,
     currency,
-    isProcessing,
+    processingStatus,
     onApprove,
     onCancel,
     onRedo
@@ -47,6 +48,10 @@ export function ReviewModal({
         setFeedback(''); // Clear feedback for next run
     };
 
+    // Calculate generic stats for the alert
+    const totalTime = processingStatus.completedBatches.reduce((a, b) => a + b.timeMs, 0);
+    const avgTime = processingStatus.completedBatches.length > 0 ? totalTime / processingStatus.completedBatches.length : 0;
+
     return (
         <Modal show={show} onHide={onHide} size="lg" centered backdrop="static" keyboard={false}>
             <Modal.Header>
@@ -56,11 +61,8 @@ export function ReviewModal({
                 </Modal.Title>
             </Modal.Header>
             <Modal.Body className="p-0">
-                {isProcessing ? (
-                    <div className="p-5 text-center">
-                        <ProgressBar animated now={100} label="Refining Analysis..." className="mb-3" />
-                        <p className="text-muted">Re-analyzing document with your instructions...</p>
-                    </div>
+                {processingStatus.isActive ? (
+                    <ProcessingOverlay status={processingStatus} />
                 ) : (
                     <>
                         {/* Transaction Table Preview */}
@@ -102,6 +104,19 @@ export function ReviewModal({
                             </Table>
                         </div>
 
+                        {/* Processing Stats Alert */}
+                        {processingStatus.completedBatches.length > 0 && !processingStatus.isActive && (
+                            <div className="px-3 pt-3">
+                                <Alert variant="success" className="mb-0 small d-flex align-items-center justify-content-between py-2">
+                                    <span>
+                                        <Check className="me-1" size={14} />
+                                        Processed <strong>{processingStatus.completedBatches.length}</strong> batches in <strong>{(totalTime / 1000).toFixed(1)}s</strong>.
+                                    </span>
+                                    <span className="text-muted">Avg: {(avgTime / 1000).toFixed(1)}s/batch</span>
+                                </Alert>
+                            </div>
+                        )}
+
                         {/* Feedback Area */}
                         <div className="p-3 border-top bg-white">
                             <Form.Group>
@@ -121,20 +136,20 @@ export function ReviewModal({
                 )}
             </Modal.Body>
             <Modal.Footer className="bg-light">
-                <Button variant="outline-danger" onClick={onCancel} disabled={isProcessing}>
+                <Button variant="outline-danger" onClick={onCancel} disabled={processingStatus.isActive}>
                     <X size={16} className="me-1" /> Discard
                 </Button>
                 <div className="ms-auto d-flex gap-2">
                     <Button
                         variant="warning"
                         onClick={handleRedo}
-                        disabled={!feedback.trim() || isProcessing}
+                        disabled={!feedback.trim() || processingStatus.isActive}
                         className="text-dark"
                     >
-                        <RefreshCw size={16} className={`me-1 ${isProcessing ? 'spin' : ''}`} />
+                        <RefreshCw size={16} className={`me-1 ${processingStatus.isActive ? 'spin' : ''}`} />
                         Refine & Redo
                     </Button>
-                    <Button variant="success" onClick={onApprove} disabled={isProcessing || transactions.length === 0}>
+                    <Button variant="success" onClick={onApprove} disabled={processingStatus.isActive || transactions.length === 0}>
                         <Check size={16} className="me-1" /> Approve & Import
                     </Button>
                 </div>

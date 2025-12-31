@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Card, Table, Badge, Form, InputGroup, Row, Col, Button } from 'react-bootstrap';
+import { Card, Table, Badge, Form, InputGroup, Row, Col, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import type { Transaction } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
-import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2 } from 'lucide-react';
+import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2, Copy } from 'lucide-react';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
 import { EditableCell } from '../ui/EditableCell';
 
@@ -11,6 +11,8 @@ interface TransactionTableProps {
     currency: string;
     onUpdateTransaction: (id: string, field: keyof Transaction, value: any) => void;
     onDeleteTransaction: (id: string) => void;
+    showDuplicates: boolean;
+    onToggleDuplicates: () => void;
 }
 
 const getBadgeVariant = (category: string) => {
@@ -44,7 +46,9 @@ export function TransactionTable({
     onSearchChange,
     categoryFilter,
     onCategoryChange,
-    allCategories
+    allCategories,
+    showDuplicates,
+    onToggleDuplicates
 }: TransactionTableProps & {
     searchTerm: string;
     onSearchChange: (val: string) => void;
@@ -77,16 +81,22 @@ export function TransactionTable({
     const sortedTransactions = useMemo(() => {
         let result = [...transactions];
 
+        // If Showing Duplicates, we ALREADY sorted by description in App.tsx to keep groups together.
+        // But the user might want to re-sort?
+        // Actually, for duplicates view, sorting by Description is critical to see them side-by-side.
+        // Let's force initial sort if duplicates are ON, or just respect user sort.
+        // For now respecting user sort is fine, but default is date.
+
         // Sort
         result.sort((a, b) => {
+            // ... existing sort ...
             let valA: any = a[sortConfig.key];
             let valB: any = b[sortConfig.key];
-
+            // ...
             if (sortConfig.key === 'date') {
                 valA = new Date(valA).getTime();
                 valB = new Date(valB).getTime();
             }
-
             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
             if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
@@ -96,17 +106,32 @@ export function TransactionTable({
     }, [transactions, sortConfig]);
 
     return (
-        <Card className="shadow-sm">
+        <Card className={`shadow-sm ${showDuplicates ? 'border-warning' : ''}`}>
             <Card.Header className="bg-white py-3">
                 <Row className="g-3 align-items-center">
                     <Col md={4}>
                         <h5 className="mb-0 fw-bold text-secondary d-flex align-items-center gap-2">
-                            Transactions
-                            <Badge bg="secondary" pill className="fs-6">{sortedTransactions.length}</Badge>
+                            {showDuplicates ? 'Duplicate Suspects' : 'Transactions'}
+                            <Badge bg={showDuplicates ? 'warning' : 'secondary'} text={showDuplicates ? 'dark' : 'light'} pill className="fs-6">
+                                {sortedTransactions.length}
+                            </Badge>
                         </h5>
                     </Col>
                     <Col md={8}>
                         <Row className="g-2 justify-content-end">
+                            <Col xs="auto">
+                                <OverlayTrigger placement="top" overlay={<Tooltip>Show Duplicates (Same Description & Amount)</Tooltip>}>
+                                    <Button
+                                        variant={showDuplicates ? "warning" : "outline-secondary"}
+                                        size="sm"
+                                        onClick={onToggleDuplicates}
+                                        className="d-flex align-items-center gap-1"
+                                    >
+                                        <Copy size={14} />
+                                        <span className="d-none d-sm-inline">Duplicates</span>
+                                    </Button>
+                                </OverlayTrigger>
+                            </Col>
                             <Col xs={6} md={5}>
                                 <InputGroup size="sm">
                                     <InputGroup.Text className="bg-light border-end-0"><Search size={14} /></InputGroup.Text>
@@ -115,16 +140,18 @@ export function TransactionTable({
                                         className="border-start-0 bg-light"
                                         value={searchTerm}
                                         onChange={(e) => onSearchChange(e.target.value)}
+                                        disabled={showDuplicates}
                                     />
                                 </InputGroup>
                             </Col>
-                            <Col xs={6} md={4}>
+                            <Col xs={6} md={3}>
                                 <InputGroup size="sm">
                                     <InputGroup.Text className="bg-light border-end-0"><Filter size={14} /></InputGroup.Text>
                                     <Form.Select
                                         className="border-start-0 bg-light"
                                         value={categoryFilter}
                                         onChange={(e) => onCategoryChange(e.target.value)}
+                                        disabled={showDuplicates}
                                     >
                                         {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                     </Form.Select>
@@ -134,6 +161,7 @@ export function TransactionTable({
                     </Col>
                 </Row>
             </Card.Header>
+            {/* ... table ... */}
 
             <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                 <Table hover borderless striped size="sm" className="mb-0 align-middle">

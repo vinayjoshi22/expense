@@ -34,6 +34,7 @@ function App() {
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [showDuplicates, setShowDuplicates] = useState(false);
 
   // Filter States (Date)
   const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set());
@@ -134,6 +135,31 @@ function App() {
 
   // Filter Data
   const filteredTransactions = useMemo(() => {
+    // 1. Duplicate Mode Logic (Overrides other filters)
+    if (showDuplicates) {
+      const groups = new Map<string, Transaction[]>();
+
+      // Group all transactions by signature
+      transactions.forEach(t => {
+        const sig = `${t.description.trim().toLowerCase()}|${t.amount}`;
+        const group = groups.get(sig) || [];
+        group.push(t);
+        groups.set(sig, group);
+      });
+
+      // Flatten only groups with > 1 item
+      const updates: Transaction[] = [];
+      groups.forEach(group => {
+        if (group.length > 1) {
+          updates.push(...group);
+        }
+      });
+
+      // Sort by description to keep groups together
+      return updates.sort((a, b) => a.description.localeCompare(b.description));
+    }
+
+    // 2. Standard Filter Logic
     let result = transactions.filter(t => {
       const date = new Date(t.date);
       const year = date.getFullYear().toString();
@@ -157,9 +183,8 @@ function App() {
       result = result.filter(t => t.category === categoryFilter);
     }
 
-    // Sort logic remains in Table for display, but filtering happens here for data consistency
     return result;
-  }, [transactions, selectedYears, selectedMonths, searchTerm, categoryFilter]);
+  }, [transactions, selectedYears, selectedMonths, searchTerm, categoryFilter, showDuplicates]);
 
   // Unique Categories for Filter Dropdown (Derived from FULL transaction list)
   const allCategories = useMemo(() => {
@@ -524,6 +549,8 @@ function App() {
                   onCategoryChange={setCategoryFilter}
                   allCategories={allCategories}
                   onDeleteTransaction={handleDeleteTransaction}
+                  showDuplicates={showDuplicates}
+                  onToggleDuplicates={() => setShowDuplicates(!showDuplicates)}
                 />
               </Col>
             </Row>

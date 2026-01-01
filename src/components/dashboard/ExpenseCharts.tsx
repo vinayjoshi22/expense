@@ -52,7 +52,7 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
 
     if (transactions.length === 0) {
         return (
-            <div className="text-center p-5 bg-light rounded border text-muted mb-3">
+            <div className="text-center p-5 bg-body-tertiary rounded border text-muted mb-3">
                 <h5>No Data available for selected month year</h5>
                 <p className="mb-0">Try adjusting your filters to see visualization.</p>
             </div>
@@ -64,8 +64,8 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
             <div className="row g-4">
                 {/* Category Breakdown (Dual Axis) */}
                 <div className="col-lg-4">
-                    <Card className="shadow-sm h-100">
-                        <Card.Header className="bg-white py-3 fw-bold text-secondary">Expense Breakdown</Card.Header>
+                    <Card className="shadow-sm h-100 bg-body">
+                        <Card.Header className="bg-body py-3 fw-bold text-secondary">Expense Breakdown</Card.Header>
                         <Card.Body>
                             <div style={{ width: '100%', height: 300 }}>
                                 <ResponsiveContainer>
@@ -93,8 +93,8 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
 
                 {/* Monthly Trends */}
                 <div className="col-lg-4">
-                    <Card className="shadow-sm h-100">
-                        <Card.Header className="bg-white py-3 fw-bold text-secondary">Cash Flow Trends</Card.Header>
+                    <Card className="shadow-sm h-100 bg-body">
+                        <Card.Header className="bg-body py-3 fw-bold text-secondary">Cash Flow Trends</Card.Header>
                         <Card.Body>
                             <div style={{ width: '100%', height: 300 }}>
                                 <ResponsiveContainer>
@@ -115,8 +115,8 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
 
                 {/* Horizontal Category Breakdown */}
                 <div className="col-lg-4">
-                    <Card className="shadow-sm h-100">
-                        <Card.Header className="bg-white py-3 fw-bold text-secondary">Expense (Horizontal)</Card.Header>
+                    <Card className="shadow-sm h-100 bg-body">
+                        <Card.Header className="bg-body py-3 fw-bold text-secondary">Expense (Horizontal)</Card.Header>
                         <Card.Body>
                             <div style={{ width: '100%', height: 300 }}>
                                 <ResponsiveContainer>

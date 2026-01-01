@@ -79,9 +79,9 @@ export const SourceSelect = ({ value, sources, onSelect, onCreate, placeholder =
                             {filteredSources.map(source => (
                                 <Button
                                     key={source}
-                                    variant={value === source ? "primary" : "light"}
+                                    variant={value === source ? "primary" : "link"}
                                     size="sm"
-                                    className={`text-start ${value === source ? '' : 'text-dark'}`}
+                                    className={`text-start text-decoration-none ${value === source ? '' : 'text-body-secondary'}`}
                                     onClick={() => {
                                         onSelect(source);
                                         document.body.click(); // Close
@@ -100,10 +100,10 @@ export const SourceSelect = ({ value, sources, onSelect, onCreate, placeholder =
             }
         >
             <div
-                className={`form-control form-control-sm d-flex align-items-center justify-content-between cursor-pointer ${className}`}
-                style={{ cursor: 'pointer', background: '#fff', minHeight: '31px' }}
+                className={`form-control form-control-sm d-flex align-items-center justify-content-between cursor-pointer bg-transparent border-0 p-0 ${className}`}
+                style={{ cursor: 'pointer', minHeight: '31px' }}
             >
-                <span className={value ? "text-dark" : "text-muted"}>
+                <span className={value ? "text-body" : "text-muted"}>
                     {value || placeholder}
                 </span>
                 {/* Visual caret could go here */}

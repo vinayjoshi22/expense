@@ -48,9 +48,9 @@ export function InvestmentList({ investments, currency, onAdd, onUpdate, onDelet
     }, [investments]);
 
     return (
-        <Card className="shadow-sm mb-4 border-info">
+        <Card className="shadow-sm mb-4 border-info bg-body">
             <Card.Header
-                className="bg-white py-3"
+                className="bg-body py-3"
                 style={{ cursor: 'pointer' }}
                 onClick={() => setIsExpanded(!isExpanded)}
             >
@@ -127,7 +127,7 @@ export function InvestmentList({ investments, currency, onAdd, onUpdate, onDelet
                         {/* List */}
                         <div className="table-responsive">
                             <Table hover borderless striped size="sm" className="mb-0 align-middle">
-                                <thead className="bg-light">
+                                <thead className="bg-body-secondary">
                                     <tr>
                                         <th className="ps-3 text-muted fw-semibold">DATE</th>
                                         <th className="text-muted fw-semibold">NAME</th>

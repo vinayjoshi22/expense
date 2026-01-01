@@ -28,12 +28,12 @@ export const SearchableSelect = ({ value, options, onChange, size }: SearchableS
         <Popover id="popover-searchable-select" className="shadow">
             <Popover.Body className="p-2">
                 <InputGroup size="sm" className="mb-2">
-                    <InputGroup.Text className="bg-light"><Search size={12} /></InputGroup.Text>
+                    <InputGroup.Text className="bg-body-secondary border-secondary"><Search size={12} /></InputGroup.Text>
                     <Form.Control
                         placeholder="Search or create..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="bg-light"
+                        className="bg-body border-secondary"
                     />
                 </InputGroup>
 
@@ -73,7 +73,7 @@ export const SearchableSelect = ({ value, options, onChange, size }: SearchableS
             onToggle={(next) => setIsOpen(next)}
         >
             <div
-                className={`form-control ${size === 'sm' ? 'form-control-sm' : ''} d-flex justify-content-between align-items-center bg-white`}
+                className={`form-control ${size === 'sm' ? 'form-control-sm' : ''} d-flex justify-content-between align-items-center bg-body`}
                 style={{ cursor: 'pointer' }}
             >
                 <span className="text-truncate">{value}</span>

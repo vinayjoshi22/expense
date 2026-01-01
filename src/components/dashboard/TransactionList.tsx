@@ -129,7 +129,7 @@ export function TransactionTable({
 
     return (
         <Card className={`shadow-sm ${showDuplicates ? 'border-warning' : ''}`}>
-            <Card.Header className="bg-white py-3">
+            <Card.Header className="bg-body py-3">
                 <Row className="g-3 align-items-center">
                     <Col md={4}>
                         <h5 className="mb-0 fw-bold text-secondary d-flex align-items-center gap-2">
@@ -167,10 +167,10 @@ export function TransactionTable({
                             </Col>
                             <Col xs={6} md={5}>
                                 <InputGroup size="sm">
-                                    <InputGroup.Text className="bg-light border-end-0"><Search size={14} /></InputGroup.Text>
+                                    <InputGroup.Text className="bg-body border-secondary border-end-0"><Search size={14} /></InputGroup.Text>
                                     <Form.Control
                                         placeholder="Search transactions..."
-                                        className="border-start-0 bg-light"
+                                        className="border-start-0 bg-body border-secondary"
                                         value={searchTerm}
                                         onChange={(e) => onSearchChange(e.target.value)}
                                         disabled={showDuplicates}
@@ -179,9 +179,9 @@ export function TransactionTable({
                             </Col>
                             <Col xs={6} md={3}>
                                 <InputGroup size="sm">
-                                    <InputGroup.Text className="bg-light border-end-0"><Filter size={14} /></InputGroup.Text>
+                                    <InputGroup.Text className="bg-body-secondary border-secondary border-end-0"><Filter size={14} /></InputGroup.Text>
                                     <Form.Select
-                                        className="border-start-0 bg-light"
+                                        className="border-start-0 bg-body border-secondary"
                                         value={categoryFilter}
                                         onChange={(e) => onCategoryChange(e.target.value)}
                                         disabled={showDuplicates}
@@ -197,7 +197,7 @@ export function TransactionTable({
 
             <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                 <Table hover borderless striped size="sm" className="mb-0 align-middle">
-                    <thead className="bg-light sticky-top" style={{ top: 0, zIndex: 1 }}>
+                    <thead className="bg-body-secondary sticky-top" style={{ top: 0, zIndex: 1 }}>
                         <tr>
                             <th className="ps-3 text-muted fw-semibold pointer" onClick={() => handleSort('date')} style={{ cursor: 'pointer' }}>
                                 DATE <SortIcon column="date" />
@@ -230,7 +230,7 @@ export function TransactionTable({
                                         format={(val) => formatDate(val)}
                                     />
                                 </td>
-                                <td className="fw-500 text-dark">
+                                <td className="fw-500 text-body">
                                     <EditableCell
                                         value={t.description}
                                         type="text"
@@ -256,7 +256,7 @@ export function TransactionTable({
                                         variantMapper={getBadgeVariant}
                                     />
                                 </td>
-                                <td className={`text-end pe-3 fw-bold font-monospace ${t.type === 'credit' ? 'text-success' : 'text-dark'}`}>
+                                <td className={`text-end pe-3 fw-bold font-monospace ${t.type === 'credit' ? 'text-success' : 'text-body'}`}>
                                     <div className="d-flex justify-content-end align-items-center gap-1">
                                         {t.type === 'credit' && <ArrowUpRight size={14} className="me-1" />}
                                         <EditableCell
@@ -287,7 +287,7 @@ export function TransactionTable({
 
             {/* Pagination Footer */}
             {sortedTransactions.length > 0 && (
-                <Card.Footer className="bg-white py-3 border-top-0">
+                <Card.Footer className="bg-body py-3 border-top-0">
                     <Row className="align-items-center justify-content-between g-3">
                         <Col xs="auto" className="d-flex align-items-center gap-2">
                             <span className="text-muted small">
@@ -301,7 +301,7 @@ export function TransactionTable({
                                     setCurrentPage(1);
                                 }}
                                 style={{ width: 'auto', cursor: 'pointer' }}
-                                className="bg-light border-0 py-0 ps-2 pe-4"
+                                className="bg-body border-secondary py-0 ps-2 pe-4"
                             >
                                 <option value={20}>20</option>
                                 <option value={50}>50</option>

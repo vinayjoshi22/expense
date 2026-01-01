@@ -48,7 +48,7 @@ export function DashboardControls({
         <div className="d-flex justify-content-end mb-3 gap-2 flex-wrap">
             {/* Source Filter */}
             <Dropdown autoClose="outside">
-                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-white shadow-sm border">
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-body shadow-sm border">
                     <Filter size={14} className="me-2" /> Sources ({selectedSources.size})
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="p-2 shadow-sm" style={{ minWidth: '220px', maxHeight: '300px', overflowY: 'auto' }}>
@@ -82,7 +82,7 @@ export function DashboardControls({
 
             {/* Year Filter */}
             <Dropdown autoClose="outside">
-                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-white shadow-sm border">
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-body shadow-sm border">
                     <Filter size={14} className="me-2" /> Years ({selectedYears.size})
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="p-2 shadow-sm" style={{ minWidth: '220px' }}>
@@ -113,7 +113,7 @@ export function DashboardControls({
 
             {/* Month Filter */}
             <Dropdown autoClose="outside">
-                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-white shadow-sm border">
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-body shadow-sm border">
                     <Filter size={14} className="me-2" /> Months ({selectedMonths.size})
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="p-2 shadow-sm" style={{ minWidth: '220px', maxHeight: '300px', overflowY: 'auto' }}>

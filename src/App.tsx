@@ -11,7 +11,7 @@ import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTr
 import type { Transaction, AppError, Investment } from './types';
 import { validateAppData, type AppData } from './lib/validator';
 import { saveAs } from 'file-saver';
-import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download, Moon, Sun } from 'lucide-react';
 
 import { DashboardControls } from './components/dashboard/DashboardControls';
 import { HowItWorksModal } from './components/ui/HowItWorksModal';
@@ -97,6 +97,16 @@ function App() {
   // Transaction Delete Logic
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showTxDeleteConfirm, setShowTxDeleteConfirm] = useState(false);
+  // Theme State
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('EA_THEME') as 'light' | 'dark') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    localStorage.setItem('EA_THEME', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
   const [dontAskDeleteAgain, setDontAskDeleteAgain] = useState(() => localStorage.getItem('EA_SKIP_DELETE_WARNING') === 'true');
 
   const handleDeleteTransaction = (id: string) => {
@@ -435,15 +445,21 @@ function App() {
   };
 
   const handleExport = () => {
-    const data: AppData = {
-      transactions,
-      investments,
-      currency,
-      sources,
-      version: 1
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    saveAs(blob, `expense-data-${new Date().toISOString().split('T')[0]}.json`);
+    try {
+      const data: AppData = {
+        transactions,
+        investments,
+        currency,
+        sources,
+        version: 1
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+      saveAs(blob, `expense-data-${new Date().toISOString().split('T')[0]}.json`);
+    } catch (err: any) {
+      console.error('Export Failed:', err);
+      setError({ title: "Export Failed", message: err instanceof Error ? err.message : "Unknown error" });
+    }
   };
 
   const [showClearDataModal, setShowClearDataModal] = useState(false);
@@ -763,6 +779,15 @@ function App() {
               )}
               <Button variant="outline-light" size="sm" onClick={handleExport} title="Export Data">
                 <Download size={16} />
+              </Button>
+              <div className="vr bg-white opacity-25 mx-1"></div>
+              <Button
+                variant="outline-light"
+                size="sm"
+                onClick={toggleTheme}
+                title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+              >
+                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
               </Button>
             </div>
           </Navbar.Collapse>

@@ -31,12 +31,12 @@ export const EditableCategoryCell = ({ value, id, allOptions, onUpdate, variantM
         <Popover id={`popover-edit-${id}`} className="shadow">
             <Popover.Body className="p-2">
                 <InputGroup size="sm" className="mb-2">
-                    <InputGroup.Text className="bg-light"><Search size={12} /></InputGroup.Text>
+                    <InputGroup.Text className="bg-body-secondary border-secondary"><Search size={12} /></InputGroup.Text>
                     <Form.Control
                         placeholder="Search or create..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="bg-light"
+                        className="bg-body border-secondary"
                     />
                 </InputGroup>
 

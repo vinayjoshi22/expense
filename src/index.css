@@ -1,12 +1,5 @@
 /* Basic resets if needed, but relying mostly on Bootstrap */
-:root {
-  --bs-body-bg: #f8f9fa;
-  /* Light grey background for dashboard feel */
-}
-
-body {
-  background-color: var(--bs-body-bg);
-}
+/* :root variables removed to let Bootstrap handle light/dark themes */
 
 /* Custom scrollbar to match Bootstrap feel if desired, or just default */
 ::-webkit-scrollbar {

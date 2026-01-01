@@ -43,7 +43,7 @@ export function SummaryCards({
         <Row className="g-3 mb-3">
             {/* Net Savings */}
             <Col sm={6} lg={3}>
-                <Card className="h-100 shadow-sm border-primary">
+                <Card className="h-100 shadow-sm border-primary bg-body">
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-start">
                             <div>
@@ -61,7 +61,7 @@ export function SummaryCards({
 
             {/* Income */}
             <Col sm={6} lg={3}>
-                <Card className="h-100 shadow-sm border-success">
+                <Card className="h-100 shadow-sm border-success bg-body">
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-start">
                             <div>
@@ -79,14 +79,14 @@ export function SummaryCards({
 
             {/* Investments */}
             <Col sm={6} lg={3}>
-                <Card className="h-100 shadow-sm border-warning">
+                <Card className="h-100 shadow-sm border-warning bg-body">
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-start">
                             <div className="flex-grow-1">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <Card.Subtitle className="text-warning fw-bold mb-0">INVESTMENTS</Card.Subtitle>
                                     <Dropdown autoClose="outside">
-                                        <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-0 text-muted border-0 no-caret">
+                                        <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-0 text-body-secondary border-0 no-caret">
                                             <Filter size={16} />
                                         </Dropdown.Toggle>
 
@@ -129,14 +129,14 @@ export function SummaryCards({
 
             {/* Expense */}
             <Col sm={6} lg={3}>
-                <Card className="h-100 shadow-sm border-danger">
+                <Card className="h-100 shadow-sm border-danger bg-body">
                     <Card.Body>
                         <div className="d-flex justify-content-between align-items-start">
                             <div className="flex-grow-1">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <Card.Subtitle className="text-danger fw-bold mb-0">EXPENSES</Card.Subtitle>
                                     <Dropdown autoClose="outside">
-                                        <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-0 text-muted border-0 no-caret">
+                                        <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-0 text-body-secondary border-0 no-caret">
                                             <Filter size={16} />
                                         </Dropdown.Toggle>
 

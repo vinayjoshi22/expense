@@ -7,9 +7,10 @@ import { TransactionTable } from './components/dashboard/TransactionList';
 import { ErrorAlert } from './components/ui/ErrorAlert';
 import { parseFile } from './lib/parser';
 import { analyzeFinancialText, fetchAvailableModels } from './lib/llm';
-import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments } from './lib/storage';
+import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments, loadSources, saveSources } from './lib/storage';
 import type { Transaction, AppError, Investment } from './types';
 import { validateAppData, type AppData } from './lib/validator';
+import { saveAs } from 'file-saver';
 import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
 import { DashboardControls } from './components/dashboard/DashboardControls';
@@ -23,7 +24,9 @@ import { ProcessingOverlay, type ProcessingStatus } from './components/ui/Proces
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
   const [investments, setInvestments] = useState<Investment[]>(() => loadInvestments());
+
   const [currency, setCurrency] = useState<string>(() => loadCurrency());
+  const [sources, setSources] = useState<string[]>(() => loadSources());
   /* isProcessing replaced by processingStatus.isActive */
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [model, setModel] = useState(localStorage.getItem('EA_SELECTED_MODEL') || 'gemini-2.5-flash-lite');
@@ -66,6 +69,10 @@ function App() {
   useEffect(() => {
     saveInvestments(investments);
   }, [investments]);
+
+  useEffect(() => {
+    saveSources(sources);
+  }, [sources]);
 
   useEffect(() => {
     localStorage.setItem('EA_SELECTED_MODEL', model);
@@ -254,6 +261,35 @@ function App() {
     setExcludedCategories(new Set(allValid));
   };
 
+  // Investment Filtering (Persistence)
+  const [includedInvestmentCategories, setIncludedInvestmentCategories] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('EA_INVESTMENT_FILTER_CATEGORIES');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set(); // Default: Start empty? User explicitly selects.
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('EA_INVESTMENT_FILTER_CATEGORIES', JSON.stringify(Array.from(includedInvestmentCategories)));
+  }, [includedInvestmentCategories]);
+
+  const toggleInvestmentCategory = (cat: string) => {
+    const next = new Set(includedInvestmentCategories);
+    if (next.has(cat)) next.delete(cat);
+    else next.add(cat);
+    setIncludedInvestmentCategories(next);
+  };
+
+  const selectAllInvestmentCategories = () => {
+    // Select all VALID categories
+    const allValid = allCategories.filter(c => c !== 'All' && c !== 'Not an expense' && c !== 'Income');
+    setIncludedInvestmentCategories(new Set(allValid));
+  }
+  const deselectAllInvestmentCategories = () => setIncludedInvestmentCategories(new Set());
+
+
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
     isActive: false,
     currentBatch: 0,
@@ -361,17 +397,11 @@ function App() {
       transactions,
       investments,
       currency,
+      sources,
       version: 1
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `expense-data-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    saveAs(blob, `expense-data-${new Date().toISOString().split('T')[0]}.json`);
   };
 
   const [showClearDataModal, setShowClearDataModal] = useState(false);
@@ -560,9 +590,17 @@ function App() {
     }
   };
 
-  const handleReviewApprove = () => {
+  const handleReviewApprove = (approvedTx: Transaction[], newSources: string[]) => {
     if (!reviewData) return;
-    setTransactions(prev => mergeTransactions(prev, reviewData.transactions));
+
+    if (newSources && newSources.length > 0) {
+      setSources(prev => {
+        const unique = new Set([...prev, ...newSources]);
+        return Array.from(unique).sort();
+      });
+    }
+
+    setTransactions(prev => mergeTransactions(prev, approvedTx));
     setInvestments(prev => mergeInvestments(prev, reviewData.newInvestments));
     setCurrency(reviewData.detectedCurrency);
 
@@ -579,6 +617,12 @@ function App() {
   // Calculations (Use filteredTransactions)
   const totalIncome = filteredTransactions.filter((t: Transaction) => t.type === 'credit').reduce((a: number, b: Transaction) => a + b.amount, 0);
 
+  const handleSourceCreate = (newSource: string) => {
+    if (!sources.includes(newSource)) {
+      setSources(prev => [...prev, newSource].sort());
+    }
+  };
+
   // Standard Expense (Used for Charts - All categories) -> Logic resides in charts/table components directly via filteredTransactions
 
 
@@ -587,7 +631,12 @@ function App() {
     .filter((t: Transaction) => t.type === 'debit' && t.category !== 'Not an expense' && expenseCardCategories.has(t.category))
     .reduce((a: number, b: Transaction) => a + b.amount, 0);
 
-  const totalSavings = totalIncome - totalExpenseCustom; // Net savings should probably reflect the "view" the user has chosen for expenses?
+  // Custom Investment (Filtered by Investment Card Dropdown - Uses TRANSACTION categories)
+  const totalInvestmentsCustom = filteredTransactions
+    .filter((t: Transaction) => t.category !== 'Not an expense' && t.category !== 'Income' && includedInvestmentCategories.has(t.category))
+    .reduce((a: number, b: Transaction) => a + b.amount, 0);
+
+  const totalSavings = totalIncome - totalExpenseCustom - totalInvestmentsCustom;
   // User asked: "Only selected category transactions should be included for computing expense... only total expense number should change".
   // This implies Net Savings should also update, otherwise `Income - Expense != Savings` which confuses users.
   // I will use `totalExpenseCustom` for Savings calculation too to maintain consistency in the top row.
@@ -770,6 +819,13 @@ function App() {
               onToggleCategory={toggleExpenseCategory}
               onSelectAll={selectAllExpenseCategories}
               onDeselectAll={deselectAllExpenseCategories}
+              investmentTotal={totalInvestmentsCustom}
+              // Correctly pass categories (same source as Expenses)
+              allInvestmentTypes={allCategories.filter(c => c !== 'All' && c !== 'Not an expense' && c !== 'Income')}
+              selectedInvestmentTypes={includedInvestmentCategories}
+              onToggleInvestmentType={toggleInvestmentCategory}
+              onSelectAllInvestments={selectAllInvestmentCategories}
+              onDeselectAllInvestments={deselectAllInvestmentCategories}
             />
 
             <Row className="g-3">
@@ -798,6 +854,8 @@ function App() {
                   showDuplicates={showDuplicates}
                   onToggleDuplicates={() => setShowDuplicates(!showDuplicates)}
                   onAddTransaction={handleAddTransaction}
+                  sources={sources}
+                  onSourceCreate={handleSourceCreate}
                 />
               </Col>
             </Row>
@@ -828,6 +886,7 @@ function App() {
         onApprove={handleReviewApprove}
         onCancel={handleReviewCancel}
         onRedo={handleReviewRedo}
+        sources={sources}
       />
 
       {/* Global Processing Overlay (for initial file load) */}

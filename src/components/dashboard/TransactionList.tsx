@@ -5,6 +5,7 @@ import { formatDate, formatCurrency } from '../../lib/utils';
 import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2, Copy, Plus } from 'lucide-react';
 import { EditableCategoryCell } from '../ui/EditableCategoryCell';
 import { EditableCell } from '../ui/EditableCell';
+import { SourceSelect } from '../ui/SourceSelect';
 
 interface TransactionTableProps {
     transactions: Transaction[];
@@ -29,7 +30,9 @@ const getBadgeVariant = (category: string) => {
     }
 }
 
-type SortKey = 'date' | 'description' | 'amount' | 'category';
+
+
+type SortKey = 'date' | 'description' | 'amount' | 'category' | 'source';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -49,7 +52,9 @@ export function TransactionTable({
     allCategories,
     showDuplicates,
     onToggleDuplicates,
-    onAddTransaction
+    onAddTransaction,
+    sources,
+    onSourceCreate
 }: TransactionTableProps & {
     searchTerm: string;
     onSearchChange: (val: string) => void;
@@ -57,6 +62,8 @@ export function TransactionTable({
     onCategoryChange: (val: string) => void;
     allCategories: string[];
     onAddTransaction: () => void;
+    sources: string[];
+    onSourceCreate: (source: string) => void;
 }) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
 
@@ -186,6 +193,9 @@ export function TransactionTable({
                             <th className="text-muted fw-semibold pointer" onClick={() => handleSort('description')} style={{ cursor: 'pointer' }}>
                                 DESCRIPTION <SortIcon column="description" />
                             </th>
+                            <th className="text-muted fw-semibold pointer" onClick={() => handleSort('source')} style={{ cursor: 'pointer', width: '140px' }}>
+                                SOURCE <SortIcon column="source" />
+                            </th>
                             <th className="text-muted fw-semibold pointer" onClick={() => handleSort('category')} style={{ cursor: 'pointer' }}>
                                 CATEGORY <SortIcon column="category" />
                             </th>
@@ -213,6 +223,16 @@ export function TransactionTable({
                                         value={t.description}
                                         type="text"
                                         onSave={(val) => onUpdateTransaction(t.id, 'description', val)}
+                                    />
+                                </td>
+                                <td>
+                                    <SourceSelect
+                                        value={t.source || ''}
+                                        sources={sources}
+                                        onSelect={(val) => onUpdateTransaction(t.id, 'source', val)}
+                                        onCreate={onSourceCreate}
+                                        placeholder="No Source"
+                                        className="border-0 bg-transparent p-0"
                                     />
                                 </td>
                                 <td>
@@ -244,7 +264,7 @@ export function TransactionTable({
                         ))}
                         {sortedTransactions.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="text-center py-5 text-muted">
+                                <td colSpan={6} className="text-center py-5 text-muted">
                                     No transactions found matching your filters.
                                 </td>
                             </tr>

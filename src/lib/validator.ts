@@ -4,6 +4,7 @@ export interface AppData {
     transactions: Transaction[];
     investments: Investment[];
     currency: string;
+    sources?: string[];
     version: number;
 }
 
@@ -43,6 +44,16 @@ export function validateAppData(data: any): data is AppData {
     // Validate Currency
     if (data.currency && typeof data.currency !== 'string') {
         throw new Error('Invalid JSON format: "currency" must be a string.');
+    }
+
+    // Validate Sources (Optional but if present must be array of strings)
+    if (data.sources && !Array.isArray(data.sources)) {
+        throw new Error('Invalid JSON format: "sources" must be an array.');
+    }
+    if (data.sources) {
+        for (const [index, s] of data.sources.entries()) {
+            if (typeof s !== 'string') throw new Error(`Source at index ${index} must be a string`);
+        }
     }
 
     return true;

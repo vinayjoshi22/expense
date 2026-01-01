@@ -20,6 +20,7 @@ export interface Transaction {
     type: TransactionType;
     category: string;
     originalText?: string;
+    source?: string;
 }
 
 export interface MonthlyStats {

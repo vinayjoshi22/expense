@@ -3,6 +3,7 @@ import type { Transaction } from '../types';
 const STORAGE_KEY = 'EA_TRANSACTIONS_V1';
 const CURRENCY_KEY = 'EA_CURRENCY_V1';
 const INVESTMENTS_KEY = 'EA_INVESTMENTS_V1';
+const SOURCES_KEY = 'EA_SOURCES_V1';
 
 export const saveTransactions = (transactions: Transaction[]) => {
     try {
@@ -30,10 +31,29 @@ export const loadCurrency = (): string => {
     return localStorage.getItem(CURRENCY_KEY) || 'USD';
 };
 
+export const saveSources = (sources: string[]) => {
+    try {
+        localStorage.setItem(SOURCES_KEY, JSON.stringify(sources));
+    } catch (e) {
+        console.error("Failed to save sources", e);
+    }
+};
+
+export const loadSources = (): string[] => {
+    try {
+        const raw = localStorage.getItem(SOURCES_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error("Failed to load sources", e);
+        return [];
+    }
+};
+
 export const clearStorage = () => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(CURRENCY_KEY);
     localStorage.removeItem(INVESTMENTS_KEY);
+    localStorage.removeItem(SOURCES_KEY);
 };
 
 export const saveInvestments = (investments: any[]) => {

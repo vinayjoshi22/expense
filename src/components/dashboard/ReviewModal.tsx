@@ -4,6 +4,7 @@ import { formatDate, formatCurrency } from '../../lib/utils';
 import type { Transaction } from '../../types';
 import { RefreshCw, Check, X } from 'lucide-react';
 import { ProcessingOverlay, type ProcessingStatus } from '../ui/ProcessingOverlay';
+import { SourceSelect } from '../ui/SourceSelect';
 
 interface ReviewModalProps {
     show: boolean;
@@ -11,9 +12,10 @@ interface ReviewModalProps {
     transactions: Transaction[];
     currency: string;
     processingStatus: ProcessingStatus;
-    onApprove: () => void;
+    onApprove: (transactions: Transaction[], newSources: string[]) => void;
     onCancel: () => void;
     onRedo: (feedback: string) => void;
+    sources: string[];
 }
 
 export function ReviewModal({
@@ -24,9 +26,27 @@ export function ReviewModal({
     processingStatus,
     onApprove,
     onCancel,
-    onRedo
+    onRedo,
+    sources
 }: ReviewModalProps) {
     const [feedback, setFeedback] = useState('');
+    const [selectedSource, setSelectedSource] = useState('');
+    const [newSourcesToAdd, setNewSourcesToAdd] = useState<string[]>([]);
+
+    // Derived source options (prop sources + newly created in this session)
+    const availableSources = [...sources, ...newSourcesToAdd].sort();
+
+    const handleCreateSource = (newSource: string) => {
+        setNewSourcesToAdd(prev => [...prev, newSource]);
+        setSelectedSource(newSource);
+    };
+
+    const handleApprove = () => {
+        if (!selectedSource) return;
+        // Apply source to all transactions
+        const taggedTransactions = transactions.map(t => ({ ...t, source: selectedSource }));
+        onApprove(taggedTransactions, newSourcesToAdd);
+    };
 
     const getBadgeVariant = (category: string) => {
         switch (category) {
@@ -53,7 +73,7 @@ export function ReviewModal({
     const avgTime = processingStatus.completedBatches.length > 0 ? totalTime / processingStatus.completedBatches.length : 0;
 
     return (
-        <Modal show={show} onHide={onHide} size="lg" centered backdrop="static" keyboard={false}>
+        <Modal show={show} onHide={onHide} size="lg" centered backdrop="static" keyboard={false} enforceFocus={false}>
             <Modal.Header>
                 <Modal.Title className="h5 fw-bold text-primary">
                     Review Extracted Transactions
@@ -65,6 +85,20 @@ export function ReviewModal({
                     <ProcessingOverlay status={processingStatus} />
                 ) : (
                     <>
+                        {/* Source Selection (Top) */}
+                        <div className="p-3 bg-light border-bottom">
+                            <Form.Label className="fw-bold small text-muted mb-2">Statement Source (Required)</Form.Label>
+                            <div style={{ maxWidth: '300px' }}>
+                                <SourceSelect
+                                    value={selectedSource}
+                                    sources={availableSources}
+                                    onSelect={setSelectedSource}
+                                    onCreate={handleCreateSource}
+                                    placeholder="Select or Create Source (e.g. Chase)"
+                                />
+                            </div>
+                        </div>
+
                         {/* Transaction Table Preview */}
                         <div className="table-responsive bg-light" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                             <Table hover striped size="sm" className="mb-0">
@@ -149,8 +183,8 @@ export function ReviewModal({
                         <RefreshCw size={16} className={`me-1 ${processingStatus.isActive ? 'spin' : ''}`} />
                         Refine & Redo
                     </Button>
-                    <Button variant="success" onClick={onApprove} disabled={processingStatus.isActive || transactions.length === 0}>
-                        <Check size={16} className="me-1" /> Approve & Import
+                    <Button variant="success" onClick={handleApprove} disabled={processingStatus.isActive || transactions.length === 0 || !selectedSource}>
+                        <Check size={16} className="me-1" /> Approve & Import (With Source)
                     </Button>
                 </div>
             </Modal.Footer>

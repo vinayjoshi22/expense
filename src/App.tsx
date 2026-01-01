@@ -584,10 +584,18 @@ function App() {
       description: 'New Transaction',
       amount: 0,
       category: 'Uncategorized',
-      type: 'debit'
+      type: 'debit',
+      source: '' // Verify it defaults to empty string or undefined? Interface says optional. Let's make it consistent.
     };
     // Add to top of list
     setTransactions(prev => [newTx, ...prev]);
+
+    // Ensure "Unknown" (empty source) is selected in filter so the new row is visible
+    setSelectedSources(prev => {
+      const next = new Set(prev);
+      next.add('');
+      return next;
+    });
   };
 
   // ... (ReviewModal State)

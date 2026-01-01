@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Card, Table, Badge, Form, InputGroup, Row, Col, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { useState, useMemo, useEffect } from 'react';
+import { Card, Table, Badge, Form, InputGroup, Row, Col, Button, OverlayTrigger, Tooltip, Pagination } from 'react-bootstrap';
 import type { Transaction } from '../../types';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { ArrowUpRight, ArrowUp, ArrowDown, Search, Filter, Trash2, Copy, Plus } from 'lucide-react';
@@ -66,6 +66,8 @@ export function TransactionTable({
     onSourceCreate: (source: string) => void;
 }) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
 
     // Categories for Editable Cell (Exclude 'All', ensuring 'Not an expense' is top)
     const uniqueCategoriesList = useMemo(() => {
@@ -113,6 +115,17 @@ export function TransactionTable({
 
         return result;
     }, [transactions, sortConfig]);
+
+    // Pagination Logic
+    const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentTransactions = sortedTransactions.slice(indexOfFirstItem, indexOfLastItem);
+
+    // Reset to page 1 if filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, categoryFilter, showDuplicates, sources]);
 
     return (
         <Card className={`shadow-sm ${showDuplicates ? 'border-warning' : ''}`}>
@@ -181,7 +194,6 @@ export function TransactionTable({
                     </Col>
                 </Row>
             </Card.Header>
-            {/* ... table ... */}
 
             <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                 <Table hover borderless striped size="sm" className="mb-0 align-middle">
@@ -208,7 +220,7 @@ export function TransactionTable({
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedTransactions.map((t) => (
+                        {currentTransactions.map((t) => (
                             <tr key={t.id}>
                                 <td className="ps-3 text-secondary font-monospace" style={{ fontSize: '0.9em' }}>
                                     <EditableCell
@@ -272,6 +284,67 @@ export function TransactionTable({
                     </tbody>
                 </Table>
             </div>
+
+            {/* Pagination Footer */}
+            {sortedTransactions.length > 0 && (
+                <Card.Footer className="bg-white py-3 border-top-0">
+                    <Row className="align-items-center justify-content-between g-3">
+                        <Col xs="auto" className="d-flex align-items-center gap-2">
+                            <span className="text-muted small">
+                                Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, sortedTransactions.length)} of {sortedTransactions.length}
+                            </span>
+                            <Form.Select
+                                size="sm"
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                style={{ width: 'auto', cursor: 'pointer' }}
+                                className="bg-light border-0 py-0 ps-2 pe-4"
+                            >
+                                <option value={20}>20</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                                <option value={sortedTransactions.length}>All</option>
+                            </Form.Select>
+                        </Col>
+
+                        <Col xs="auto">
+                            <Pagination size="sm" className="mb-0">
+                                <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} />
+                                <Pagination.Prev onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} />
+
+                                {totalPages <= 5 ? (
+                                    [...Array(totalPages)].map((_, idx) => (
+                                        <Pagination.Item key={idx + 1} active={idx + 1 === currentPage} onClick={() => setCurrentPage(idx + 1)}>
+                                            {idx + 1}
+                                        </Pagination.Item>
+                                    ))
+                                ) : (
+                                    <>
+                                        <Pagination.Item active={currentPage === 1} onClick={() => setCurrentPage(1)}>1</Pagination.Item>
+
+                                        {currentPage > 3 && <Pagination.Ellipsis />}
+
+                                        {/* Show range around current */}
+                                        {currentPage > 1 && currentPage < totalPages && (
+                                            <Pagination.Item active>{currentPage}</Pagination.Item>
+                                        )}
+
+                                        {currentPage < totalPages - 2 && <Pagination.Ellipsis />}
+
+                                        <Pagination.Item active={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>{totalPages}</Pagination.Item>
+                                    </>
+                                )}
+
+                                <Pagination.Next onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} />
+                                <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} />
+                            </Pagination>
+                        </Col>
+                    </Row>
+                </Card.Footer>
+            )}
         </Card>
     );
 }

@@ -86,8 +86,8 @@ export function ReviewModal({
                 ) : (
                     <>
                         {/* Source Selection (Top) */}
-                        <div className="p-3 bg-light border-bottom">
-                            <Form.Label className="fw-bold small text-muted mb-2">Statement Source (Required)</Form.Label>
+                        <div className="p-3 bg-body-tertiary border-bottom">
+                            <Form.Label className="fw-bold small text-body-secondary mb-2">Statement Source (Required)</Form.Label>
                             <div style={{ maxWidth: '300px' }}>
                                 <SourceSelect
                                     value={selectedSource}
@@ -95,14 +95,15 @@ export function ReviewModal({
                                     onSelect={setSelectedSource}
                                     onCreate={handleCreateSource}
                                     placeholder="Select or Create Source (e.g. Chase)"
+                                    className="bg-body border-secondary"
                                 />
                             </div>
                         </div>
 
                         {/* Transaction Table Preview */}
-                        <div className="table-responsive bg-light" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <div className="table-responsive bg-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                             <Table hover striped size="sm" className="mb-0">
-                                <thead className="bg-white sticky-top shadow-sm" style={{ top: 0 }}>
+                                <thead className="bg-body-secondary sticky-top shadow-sm" style={{ top: 0 }}>
                                     <tr>
                                         <th className="ps-3 py-2 text-muted small" style={{ width: '50px' }}>#</th>
                                         <th className="py-2 text-muted small">Date</th>
@@ -152,16 +153,16 @@ export function ReviewModal({
                         )}
 
                         {/* Feedback Area */}
-                        <div className="p-3 border-top bg-white">
+                        <div className="p-3 border-top bg-body">
                             <Form.Group>
-                                <Form.Label className="fw-bold small text-muted">Something wrong? Improve the results:</Form.Label>
+                                <Form.Label className="fw-bold small text-body-secondary">Something wrong? Improve the results:</Form.Label>
                                 <Form.Control
                                     as="textarea"
                                     rows={2}
                                     placeholder="e.g. 'The date format is DD/MM/YYYY', 'Amazon should be Shopping', 'Ignore pending txns'..."
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
-                                    className="bg-light"
+                                    className="bg-body-secondary"
                                     style={{ fontSize: '0.9rem' }}
                                 />
                             </Form.Group>
@@ -169,7 +170,7 @@ export function ReviewModal({
                     </>
                 )}
             </Modal.Body>
-            <Modal.Footer className="bg-light">
+            <Modal.Footer className="bg-body-tertiary">
                 <Button variant="outline-danger" onClick={onCancel} disabled={processingStatus.isActive}>
                     <X size={16} className="me-1" /> Discard
                 </Button>

@@ -28,7 +28,7 @@ export function FileDrop({ onFilesSelected, isProcessing }: FileDropProps) {
     return (
         <div
             {...getRootProps()}
-            className={`p-4 text-center border rounded bg-light ${isDragActive ? 'border-primary bg-white' : 'border-secondary'} ${isProcessing ? 'opacity-50' : ''}`}
+            className={`p-4 text-center border rounded transition-all ${isDragActive ? 'border-primary bg-body-tertiary' : 'border-secondary bg-body-secondary'} ${isProcessing ? 'opacity-50' : ''}`}
             style={{ borderStyle: 'dashed', borderWidth: '2px', cursor: isProcessing ? 'default' : 'pointer' }}
         >
             <input {...getInputProps()} />
@@ -36,15 +36,15 @@ export function FileDrop({ onFilesSelected, isProcessing }: FileDropProps) {
             {isProcessing ? (
                 <div className="py-4">
                     <Spinner animation="border" variant="primary" role="status" className="mb-3" />
-                    <p className="text-muted mb-0">Processing your file...</p>
+                    <p className="text-body-secondary mb-0">Processing your file...</p>
                 </div>
             ) : (
                 <div className="py-2">
-                    <div className="mb-3 p-3 d-inline-block rounded-circle bg-white shadow-sm text-primary">
+                    <div className="mb-3 p-3 d-inline-block rounded-circle bg-body shadow-sm text-primary">
                         <Upload size={32} />
                     </div>
-                    <h5 className="mb-2">Drag & drop bank statement</h5>
-                    <p className="text-muted small mb-0">PDF, JSON, or Text files supported</p>
+                    <h5 className="mb-2 text-body">Drag & drop bank statement</h5>
+                    <p className="text-body-secondary small mb-0">PDF, JSON, or Text files supported</p>
                 </div>
             )}
         </div>

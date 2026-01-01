@@ -664,6 +664,12 @@ function App() {
         const unique = new Set([...prev, ...newSources]);
         return Array.from(unique).sort();
       });
+      // Auto-select new sources so data is visible immediately
+      setSelectedSources(prev => {
+        const next = new Set(prev);
+        newSources.forEach(s => next.add(s));
+        return next;
+      });
     }
 
     setTransactions(prev => mergeTransactions(prev, approvedTx));

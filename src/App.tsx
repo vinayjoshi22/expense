@@ -158,6 +158,43 @@ function App() {
   const selectAllYears = () => setSelectedYears(new Set(availableYears));
   const deselectAllYears = () => setSelectedYears(new Set());
 
+  // Source Filtering (Persistence)
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('EA_SOURCE_FILTER');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Unique Sources
+  const availableSources = useMemo(() => {
+    const s = new Set(transactions.map(t => t.source || ''));
+    return Array.from(s).sort();
+  }, [transactions]);
+
+  // If selectedSources is empty (first load), select ALL available
+  useEffect(() => {
+    if (localStorage.getItem('EA_SOURCE_FILTER') === null && availableSources.length > 0) {
+      setSelectedSources(new Set(availableSources));
+    }
+  }, [availableSources.length]);
+
+  useEffect(() => {
+    localStorage.setItem('EA_SOURCE_FILTER', JSON.stringify(Array.from(selectedSources)));
+  }, [selectedSources]);
+
+  const toggleSource = (source: string) => {
+    const next = new Set(selectedSources);
+    if (next.has(source)) next.delete(source);
+    else next.add(source);
+    setSelectedSources(next);
+  };
+
+  const selectAllSources = () => setSelectedSources(new Set(availableSources));
+  const deselectAllSources = () => setSelectedSources(new Set());
+
   const selectAllMonths = () => setSelectedMonths(new Set(availableMonths));
   const deselectAllMonths = () => setSelectedMonths(new Set());
 
@@ -192,7 +229,8 @@ function App() {
       const date = new Date(t.date);
       const year = date.getFullYear().toString();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      return selectedYears.has(year) && selectedMonths.has(month);
+      const source = t.source || ''; // Match availableSources logic
+      return selectedYears.has(year) && selectedMonths.has(month) && selectedSources.has(source);
     });
 
     // Search Filter
@@ -212,7 +250,8 @@ function App() {
     }
 
     return result;
-  }, [transactions, selectedYears, selectedMonths, searchTerm, categoryFilter, showDuplicates]);
+    return result;
+  }, [transactions, selectedYears, selectedMonths, selectedSources, searchTerm, categoryFilter, showDuplicates]);
 
   // Unique Categories for Filter Dropdown (Derived from FULL transaction list)
   const allCategories = useMemo(() => {
@@ -260,6 +299,9 @@ function App() {
     const allValid = allCategories.filter(c => c !== 'All' && c !== 'Not an expense' && c !== 'Income');
     setExcludedCategories(new Set(allValid));
   };
+
+
+
 
   // Investment Filtering (Persistence)
   const [includedInvestmentCategories, setIncludedInvestmentCategories] = useState<Set<string>>(() => {
@@ -806,6 +848,11 @@ function App() {
               onDeselectAllYears={deselectAllYears}
               onSelectAllMonths={selectAllMonths}
               onDeselectAllMonths={deselectAllMonths}
+              availableSources={availableSources}
+              selectedSources={selectedSources}
+              onToggleSource={toggleSource}
+              onSelectAllSources={selectAllSources}
+              onDeselectAllSources={deselectAllSources}
             />
 
             {/* Dashboard */}

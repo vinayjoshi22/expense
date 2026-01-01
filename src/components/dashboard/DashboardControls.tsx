@@ -12,6 +12,11 @@ interface DashboardControlsProps {
     onDeselectAllYears: () => void;
     onSelectAllMonths: () => void;
     onDeselectAllMonths: () => void;
+    availableSources: string[];
+    selectedSources: Set<string>;
+    onToggleSource: (source: string) => void;
+    onSelectAllSources: () => void;
+    onDeselectAllSources: () => void;
 }
 
 const ALL_MONTHS = [
@@ -31,11 +36,50 @@ export function DashboardControls({
     onSelectAllYears,
     onDeselectAllYears,
     onSelectAllMonths,
-    onDeselectAllMonths
+    onDeselectAllMonths,
+    availableSources,
+    selectedSources,
+    onToggleSource,
+    onSelectAllSources,
+    onDeselectAllSources
 }: DashboardControlsProps) {
 
     return (
         <div className="d-flex justify-content-end mb-3 gap-2 flex-wrap">
+            {/* Source Filter */}
+            <Dropdown autoClose="outside">
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-white shadow-sm border">
+                    <Filter size={14} className="me-2" /> Sources ({selectedSources.size})
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="p-2 shadow-sm" style={{ minWidth: '220px', maxHeight: '300px', overflowY: 'auto' }}>
+                    <div className="d-flex justify-content-between align-items-center px-2 mb-2">
+                        <span className="fw-bold small text-muted">Select Sources</span>
+                        <div className="d-flex gap-1">
+                            <Button variant="link" size="sm" className="p-0 text-decoration-none" style={{ fontSize: '0.75rem' }} onClick={onSelectAllSources}>All</Button>
+                            <span className="text-muted" style={{ fontSize: '0.75rem' }}>|</span>
+                            <Button variant="link" size="sm" className="p-0 text-decoration-none text-danger" style={{ fontSize: '0.75rem' }} onClick={onDeselectAllSources}>Clear</Button>
+                        </div>
+                    </div>
+
+                    {availableSources.length === 0 ? (
+                        <div className="p-2 text-muted small text-center">No sources found</div>
+                    ) : (
+                        availableSources.map(source => (
+                            <div key={source} className="dropdown-item-custom rounded" onClick={() => onToggleSource(source)}>
+                                <Form.Check
+                                    type="checkbox"
+                                    id={`source-${source}`}
+                                    label={source || 'Unknown'} // Handle empty source strings
+                                    checked={selectedSources.has(source)}
+                                    onChange={() => { }}
+                                    style={{ pointerEvents: 'none' }}
+                                />
+                            </div>
+                        ))
+                    )}
+                </Dropdown.Menu>
+            </Dropdown>
+
             {/* Year Filter */}
             <Dropdown autoClose="outside">
                 <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-white shadow-sm border">

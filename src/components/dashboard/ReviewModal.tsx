@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button, Table, Form, Badge, Alert } from 'react-bootstrap';
 import { formatDate, formatCurrency } from '../../lib/utils';
-import type { Transaction } from '../../types';
+import type { Transaction, Loan } from '../../types';
 import { RefreshCw, Check, X } from 'lucide-react';
 import { ProcessingOverlay, type ProcessingStatus } from '../ui/ProcessingOverlay';
 import { SourceSelect } from '../ui/SourceSelect';
@@ -12,9 +12,10 @@ interface ReviewModalProps {
     show: boolean;
     onHide: () => void;
     transactions: Transaction[];
+    loans?: Loan[]; // Added prop
     currency: string;
     processingStatus: ProcessingStatus;
-    onApprove: (transactions: Transaction[], newSources: string[], balance?: any) => void;
+    onApprove: (transactions: Transaction[], newSources: string[], balance?: any, accountType?: 'bank' | 'cc', loans?: Loan[]) => void;
     onCancel: () => void;
     onRedo: (feedback: string) => void;
     sources: string[];
@@ -33,19 +34,32 @@ export function ReviewModal({
     onRedo,
     sources,
     initialBalances,
-    initialPeriod
+    initialPeriod,
+    loans
 }: ReviewModalProps) {
     const [feedback, setFeedback] = useState('');
     const [selectedSource, setSelectedSource] = useState('');
+    const [accountType, setAccountType] = useState<'bank' | 'cc'>('bank');
     const [newSourcesToAdd, setNewSourcesToAdd] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState<'transactions' | 'loans'>('transactions'); // Tab state
 
     // Manage Transactions locally for editing
     const [txList, setTxList] = useState<Transaction[]>(transactions);
+    // Manage Loans locally
+    const [loanList, setLoanList] = useState<Loan[]>(loans || []);
 
-    // Sync prop transactions to local state when modal opens or re-processes
+    // Sync prop transactions to local state
     useEffect(() => {
         setTxList(transactions);
-    }, [transactions]);
+        if (loans) setLoanList(loans);
+
+        // Auto-switch tab if only loans found (rare) or if loans exist
+        if (loans && loans.length > 0 && transactions.length === 0) {
+            setActiveTab('loans');
+        } else {
+            setActiveTab('transactions');
+        }
+    }, [transactions, loans]);
 
     // Balance State
     const [openingBalance, setOpeningBalance] = useState<string>(initialBalances?.opening?.toString() || '');
@@ -118,9 +132,11 @@ export function ReviewModal({
             };
         }
 
-        // Apply source to all transactions
+        // Apply source to all transactions and loans
         const taggedTransactions = txList.map(t => ({ ...t, source: selectedSource }));
-        onApprove(taggedTransactions, newSourcesToAdd, balanceObj);
+        const taggedLoans = loanList.map(l => ({ ...l, source: selectedSource }));
+
+        onApprove(taggedTransactions, newSourcesToAdd, balanceObj, accountType, taggedLoans);
     };
 
     const getBadgeVariant = (category: string) => {
@@ -150,9 +166,10 @@ export function ReviewModal({
     return (
         <Modal show={show} onHide={onHide} size="lg" centered backdrop="static" keyboard={false} enforceFocus={false}>
             <Modal.Header>
-                <Modal.Title className="h5 fw-bold text-primary">
-                    Review Extracted Transactions
-                    <Badge bg="secondary" className="ms-2 fs-6">{transactions.length}</Badge>
+                <Modal.Title className="h5 fw-bold text-primary d-flex align-items-center gap-2">
+                    Review Extracted Data
+                    <Badge bg="secondary" className="fs-6">{transactions.length} Txns</Badge>
+                    {(loans && loans.length > 0) && <Badge bg="warning" text="dark" className="fs-6">{loans.length} Loans</Badge>}
                 </Modal.Title>
             </Modal.Header>
             <Modal.Body className="p-0">
@@ -160,9 +177,21 @@ export function ReviewModal({
                     <ProcessingOverlay status={processingStatus} />
                 ) : (
                     <>
-                        {/* Source Selection & Balance Config */}
+                        {/* Config Area */}
                         <div className="p-3 bg-body-tertiary border-bottom">
                             <div className="row g-3">
+                                <div className="col-md-4">
+                                    <Form.Label className="fw-bold small text-body-secondary mb-1">Account Type</Form.Label>
+                                    <Form.Select
+                                        size="sm"
+                                        className="bg-body border-secondary text-body"
+                                        value={accountType}
+                                        onChange={(e) => setAccountType(e.target.value as 'bank' | 'cc')}
+                                    >
+                                        <option value="bank">Bank Account</option>
+                                        <option value="cc">Credit Card</option>
+                                    </Form.Select>
+                                </div>
                                 <div className="col-md-4">
                                     <Form.Label className="fw-bold small text-body-secondary mb-1">Statement Source (Required)</Form.Label>
                                     <SourceSelect
@@ -224,86 +253,136 @@ export function ReviewModal({
                             </div>
                         </div>
 
-                        {/* Transaction Table Preview */}
+                        {/* Tabs if loans present */}
+                        {(loans && loans.length > 0) && (
+                            <div className="px-3 pt-3">
+                                <ul className="nav nav-tabs">
+                                    <li className="nav-item">
+                                        <button
+                                            className={`nav-link ${activeTab === 'transactions' ? 'active fw-bold' : ''}`}
+                                            onClick={() => setActiveTab('transactions')}
+                                        >
+                                            Transactions
+                                        </button>
+                                    </li>
+                                    <li className="nav-item">
+                                        <button
+                                            className={`nav-link ${activeTab === 'loans' ? 'active fw-bold text-warning-emphasis' : 'text-body'}`}
+                                            onClick={() => setActiveTab('loans')}
+                                        >
+                                            Active Loans
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Content Area */}
                         <div className="table-responsive bg-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                            <Table hover striped size="sm" className="mb-0">
-                                <thead className="bg-body-secondary sticky-top shadow-sm" style={{ top: 0 }}>
-                                    <tr>
-                                        <th className="ps-3 py-2 text-muted small" style={{ width: '50px' }}>#</th>
-                                        <th className="py-2 text-muted small">Date</th>
-                                        <th className="py-2 text-muted small">Description</th>
-                                        <th className="py-2 text-muted small">Category</th>
-                                        <th className="pe-3 py-2 text-end text-muted small">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {txList.map((t, index) => (
-                                        <tr key={t.id}>
-                                            <td className="ps-3 border-0 small align-middle text-muted">{index + 1}</td>
-                                            <td className="border-0 small align-middle font-monospace text-secondary">
-                                                <EditableCell
-                                                    value={t.date}
-                                                    type="date"
-                                                    onSave={(val) => {
-                                                        setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, date: val } : tx));
-                                                    }}
-                                                    format={formatDate}
-                                                />
-                                            </td>
-                                            <td className="border-0 small align-middle fw-500">
-                                                <EditableCell
-                                                    value={t.description}
-                                                    type="text"
-                                                    onSave={(val) => {
-                                                        setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, description: val } : tx));
-                                                    }}
-                                                />
-                                            </td>
-                                            <td className="border-0 small align-middle">
-                                                <EditableCategoryCell
-                                                    id={t.id}
-                                                    value={t.category}
-                                                    allOptions={['Not an expense', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Utilities', 'Travel', 'Transfer', 'Income', 'Other']} // Use standard list or pass from parent? Standard list fine for now or derived?
-                                                    onUpdate={(id, val) => {
-                                                        setTxList(prev => prev.map(tx => {
-                                                            if (tx.id !== id) return tx;
-                                                            // Smart Type Logic
-                                                            const updates: Partial<Transaction> = { category: val };
-                                                            if (val === 'Income') {
-                                                                updates.type = 'credit';
-                                                            } else if (tx.type === 'credit') {
-                                                                updates.type = 'debit';
-                                                            }
-                                                            return { ...tx, ...updates };
-                                                        }));
-                                                    }}
-                                                    variantMapper={getBadgeVariant}
-                                                />
-                                            </td>
-                                            <td className={`pe-3 border-0 small align-middle text-end font-monospace fw-bold ${t.type === 'credit' ? 'text-success' : 'text-body'}`}>
-                                                <EditableCell
-                                                    value={t.amount}
-                                                    type="number"
-                                                    onSave={(val) => {
-                                                        setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, amount: val } : tx));
-                                                    }}
-                                                    format={(val) => formatCurrency(val, currency)}
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {transactions.length === 0 && (
+                            {activeTab === 'transactions' ? (
+                                <Table hover striped size="sm" className="mb-0">
+                                    <thead className="bg-body-secondary sticky-top shadow-sm" style={{ top: 0 }}>
                                         <tr>
-                                            <td colSpan={4} className="text-center py-5 text-muted">
-                                                No transactions found. Try refining the prompt.
-                                            </td>
+                                            <th className="ps-3 py-2 text-muted small" style={{ width: '50px' }}>#</th>
+                                            <th className="py-2 text-muted small">Date</th>
+                                            <th className="py-2 text-muted small">Description</th>
+                                            <th className="py-2 text-muted small">Category</th>
+                                            <th className="pe-3 py-2 text-end text-muted small">Amount</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </Table>
+                                    </thead>
+                                    <tbody>
+                                        {txList.map((t, index) => (
+                                            <tr key={t.id}>
+                                                <td className="ps-3 border-0 small align-middle text-muted">{index + 1}</td>
+                                                <td className="border-0 small align-middle font-monospace text-secondary">
+                                                    <EditableCell
+                                                        value={t.date}
+                                                        type="date"
+                                                        onSave={(val) => {
+                                                            setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, date: val } : tx));
+                                                        }}
+                                                        format={formatDate}
+                                                    />
+                                                </td>
+                                                <td className="border-0 small align-middle fw-500">
+                                                    <EditableCell
+                                                        value={t.description}
+                                                        type="text"
+                                                        onSave={(val) => {
+                                                            setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, description: val } : tx));
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="border-0 small align-middle">
+                                                    <EditableCategoryCell
+                                                        id={t.id}
+                                                        value={t.category}
+                                                        allOptions={['Not an expense', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Utilities', 'Travel', 'Transfer', 'Income', 'Other']}
+                                                        onUpdate={(id, val) => {
+                                                            setTxList(prev => prev.map(tx => {
+                                                                if (tx.id !== id) return tx;
+                                                                const updates: Partial<Transaction> = { category: val };
+                                                                if (val === 'Income') {
+                                                                    updates.type = 'credit';
+                                                                } else if (tx.type === 'credit') {
+                                                                    updates.type = 'debit';
+                                                                }
+                                                                return { ...tx, ...updates };
+                                                            }));
+                                                        }}
+                                                        variantMapper={getBadgeVariant}
+                                                    />
+                                                </td>
+                                                <td className={`pe-3 border-0 small align-middle text-end font-monospace fw-bold ${t.type === 'credit' ? 'text-success' : 'text-body'}`}>
+                                                    <EditableCell
+                                                        value={t.amount}
+                                                        type="number"
+                                                        onSave={(val) => {
+                                                            setTxList(prev => prev.map(tx => tx.id === t.id ? { ...tx, amount: val } : tx));
+                                                        }}
+                                                        format={(val) => formatCurrency(val, currency)}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {transactions.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="text-center py-5 text-muted">
+                                                    No transactions found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </Table>
+                            ) : (
+                                // LOANS TABLE PREVIEW
+                                <Table hover striped size="sm" className="mb-0">
+                                    <thead className="bg-warning-subtle sticky-top shadow-sm" style={{ top: 0 }}>
+                                        <tr>
+                                            <th className="ps-3 py-2 text-dark small border-0">Description</th>
+                                            <th className="py-2 text-end text-dark small border-0">Total</th>
+                                            <th className="py-2 text-end text-dark small border-0">Outstanding</th>
+                                            <th className="pe-3 py-2 text-end text-dark small border-0">EMI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {loanList.map((l) => (
+                                            <tr key={l.id}>
+                                                <td className="ps-3 border-0 small align-middle fw-medium">{l.description}</td>
+                                                <td className="border-0 small align-middle text-end text-muted">{formatCurrency(l.totalAmount, currency)}</td>
+                                                <td className="border-0 small align-middle text-end fw-bold text-danger">{formatCurrency(l.remainingAmount, currency)}</td>
+                                                <td className="pe-3 border-0 small align-middle text-end fw-bold">{formatCurrency(l.installmentAmount, currency)}</td>
+                                            </tr>
+                                        ))}
+                                        {loanList.length === 0 && (
+                                            <tr><td colSpan={4} className="text-center p-4 text-muted">No loans detected.</td></tr>
+                                        )}
+                                    </tbody>
+                                </Table>
+                            )}
                         </div>
 
-                        {/* Processing Stats Alert */}
+                        {/* Processing Stats & Feedback */}
                         {processingStatus.completedBatches.length > 0 && !processingStatus.isActive && (
                             <div className="px-3 pt-3">
                                 <Alert variant="success" className="mb-0 small d-flex align-items-center justify-content-between py-2">
@@ -316,7 +395,6 @@ export function ReviewModal({
                             </div>
                         )}
 
-                        {/* Feedback Area */}
                         <div className="p-3 border-top bg-body">
                             <Form.Group>
                                 <Form.Label className="fw-bold small text-body-secondary">Something wrong? Improve the results:</Form.Label>
@@ -348,7 +426,7 @@ export function ReviewModal({
                         <RefreshCw size={16} className={`me-1 ${processingStatus.isActive ? 'spin' : ''}`} />
                         Refine & Redo
                     </Button>
-                    <Button variant="success" onClick={handleApprove} disabled={processingStatus.isActive || transactions.length === 0 || !selectedSource}>
+                    <Button variant="success" onClick={handleApprove} disabled={processingStatus.isActive || (transactions.length === 0 && (!loans || loans.length === 0)) || !selectedSource}>
                         <Check size={16} className="me-1" /> Approve & Import (With Source)
                     </Button>
                 </div>

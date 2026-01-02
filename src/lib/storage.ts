@@ -23,6 +23,26 @@ export const loadTransactions = (): Transaction[] => {
     }
 };
 
+const CC_STORAGE_KEY = 'EA_CC_TRANSACTIONS_V1';
+
+export const saveCcTransactions = (transactions: Transaction[]) => {
+    try {
+        localStorage.setItem(CC_STORAGE_KEY, JSON.stringify(transactions));
+    } catch (e) {
+        console.error("Failed to save CC transactions", e);
+    }
+};
+
+export const loadCcTransactions = (): Transaction[] => {
+    try {
+        const raw = localStorage.getItem(CC_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error("Failed to load CC transactions", e);
+        return [];
+    }
+};
+
 export const saveCurrency = (currency: string) => {
     localStorage.setItem(CURRENCY_KEY, currency);
 };
@@ -55,6 +75,7 @@ export const clearStorage = () => {
     localStorage.removeItem(INVESTMENTS_KEY);
     localStorage.removeItem(SOURCES_KEY);
     localStorage.removeItem(BALANCES_KEY);
+    localStorage.removeItem(CC_STORAGE_KEY);
 };
 
 export const saveInvestments = (investments: any[]) => {
@@ -126,6 +147,47 @@ export const mergeInvestments = (existing: any[], incoming: any[]): any[] => {
     });
 
     console.log(`Merged ${incoming.length} incoming investments. Added ${newCount} new unique records.`);
+    return Array.from(map.values());
+};
+
+const LOANS_KEY = 'EA_LOANS_V1';
+
+export const saveLoans = (loans: any[]) => {
+    try {
+        localStorage.setItem(LOANS_KEY, JSON.stringify(loans));
+    } catch (e) {
+        console.error("Failed to save loans", e);
+    }
+};
+
+export const loadLoans = (): any[] => {
+    try {
+        const raw = localStorage.getItem(LOANS_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error("Failed to load loans", e);
+        return [];
+    }
+};
+
+export const mergeLoans = (existing: any[], incoming: any[]): any[] => {
+    const map = new Map<string, any>();
+
+    // 1. Load existing
+    existing.forEach(i => {
+        if (i.id) map.set(i.id, i);
+    });
+
+    // 2. Merge incoming (avoid duplicates by ID)
+    let newCount = 0;
+    incoming.forEach(i => {
+        if (i.id && !map.has(i.id)) {
+            map.set(i.id, i);
+            newCount++;
+        }
+    });
+
+    console.log(`Merged ${incoming.length} incoming loans. Added ${newCount} new unique records.`);
     return Array.from(map.values());
 };
 

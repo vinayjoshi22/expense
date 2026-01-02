@@ -7,7 +7,7 @@ interface ClearDataModalProps {
     onHide: () => void;
     onClearAll: () => void;
     onClearInvestments: () => void;
-    onClearTransactions: (year?: string, month?: string) => void;
+    onClearTransactions: (year?: string, month?: string, accountType?: 'all' | 'bank' | 'cc') => void;
     availableYears: string[];
 }
 
@@ -22,30 +22,19 @@ export function ClearDataModal({
     const [activeTab, setActiveTab] = useState('transactions');
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [accountType, setAccountType] = useState<'all' | 'bank' | 'cc'>('all');
 
     // Reset selection on open/tab change
     const handleTabSelect = (k: string | null) => {
         if (k) setActiveTab(k);
         setSelectedYear('');
         setSelectedMonth('');
+        setAccountType('all');
     };
 
     const handleTxDelete = () => {
-        if (!selectedYear && !selectedMonth) {
-            // If nothing selected, assume "All Transactions" (maybe risky? let's enforce selection or explicit "All" button)
-            // Strategy: If user is in "Transactions" tab, we force them to pick at least a year, OR have a "Clear ALL Transactions" button separate.
-            // Let's support: Clear specific, or Clear All Txns.
-            // For now, let's enforce Year selection if they want partial. 
-            // If they want clear all txns, they can use the Danger Zone -> Reset App (which clears everything), or we add a specific "Clear All Transactions" button.
-            // Let's add "Clear All Transactions" button in the tab.
-            if (confirm("Delete ALL transactions? This cannot be undone.")) {
-                onClearTransactions();
-                onHide();
-            }
-        } else {
-            onClearTransactions(selectedYear, selectedMonth);
-            onHide();
-        }
+        onClearTransactions(selectedYear, selectedMonth, accountType);
+        onHide();
     };
 
     return (
@@ -79,6 +68,15 @@ export function ClearDataModal({
                             <p className="small text-muted mb-3">Delete specific transactions by date, or clear your entire transaction history.</p>
 
                             <Form.Group className="mb-3">
+                                <Form.Label className="small fw-bold">Account Type</Form.Label>
+                                <Form.Select value={accountType} onChange={e => setAccountType(e.target.value as any)}>
+                                    <option value="all">All Accounts</option>
+                                    <option value="bank">Bank Accounts Only</option>
+                                    <option value="cc">Credit Cards Only</option>
+                                </Form.Select>
+                            </Form.Group>
+
+                            <Form.Group className="mb-3">
                                 <Form.Label className="small fw-bold">Select Year (Optional)</Form.Label>
                                 <Form.Select value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
                                     <option value="">-- All Years --</option>
@@ -103,9 +101,7 @@ export function ClearDataModal({
                             <div className="d-grid gap-2">
                                 <Button variant="outline-danger" onClick={handleTxDelete}>
                                     <Trash2 size={16} className="me-2" />
-                                    {selectedYear
-                                        ? `Delete ${selectedMonth ? `${selectedMonth}/` : ''}${selectedYear} Data`
-                                        : "Delete ALL Transactions"}
+                                    Delete Transactions
                                 </Button>
                             </div>
                         </Tab.Pane>

@@ -1,0 +1,14 @@
+
+Transaction Statement for Jan 2024
+Opening Balance: 50000
+Closing Balance: 40000
+
+Transactions:
+01/01/2024 - Salary Credit - CR 100000
+05/01/2024 - Rent Payment - DR 25000
+10/01/2024 - Grocery Store - DR 5000
+15/01/2024 - HDFC Personal Loan EMI - DR 12500
+
+Active Loans:
+1. Personal Loan - HDFC Bank - Principal: 500000 - EMI: 12500 - Interest: 10.5% - Tenure: 60 months
+2. Car Loan - SBI - Principal: 800000 - EMI: 15000 - Outstanding: 650000

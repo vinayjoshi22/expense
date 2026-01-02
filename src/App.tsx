@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Navbar, Container, Button, Row, Col, Collapse, Form, InputGroup, Modal, Dropdown } from 'react-bootstrap';
 import { FileDrop } from './components/dashboard/FileDrop';
 import { SummaryCards } from './components/dashboard/SummaryCards';
@@ -8,8 +8,9 @@ import { ErrorAlert } from './components/ui/ErrorAlert';
 import { parseFile } from './lib/parser';
 import { analyzeFinancialText, fetchAvailableModels } from './lib/llm';
 import { BalanceCards } from './components/dashboard/BalanceCards';
-import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments, loadSources, saveSources, loadBalances, saveBalances, mergeBalances } from './lib/storage';
-import type { Transaction, AppError, Investment, StatementBalance } from './types';
+import { LoanTable } from './components/dashboard/LoanTable';
+import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments, loadSources, saveSources, loadBalances, saveBalances, mergeBalances, loadCcTransactions, saveCcTransactions, loadLoans, saveLoans, mergeLoans } from './lib/storage';
+import type { Transaction, AppError, Investment, StatementBalance, Loan } from './types';
 import { validateAppData, type AppData } from './lib/validator';
 import { saveAs } from 'file-saver';
 import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download, Moon, Sun } from 'lucide-react';
@@ -21,10 +22,13 @@ import { BulkCategoryModal } from './components/dashboard/BulkCategoryModal';
 import { ReviewModal } from './components/dashboard/ReviewModal';
 import { ClearDataModal } from './components/dashboard/ClearDataModal';
 import { ProcessingOverlay, type ProcessingStatus } from './components/ui/ProcessingOverlay';
+import { ScrollToTop } from './components/ui/ScrollToTop';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
+  const [ccTransactions, setCcTransactions] = useState<Transaction[]>(() => loadCcTransactions());
   const [investments, setInvestments] = useState<Investment[]>(() => loadInvestments());
+  const [loans, setLoans] = useState<Loan[]>(() => loadLoans());
   const [balances, setBalances] = useState<StatementBalance[]>(() => loadBalances());
 
   const [currency, setCurrency] = useState<string>(() => loadCurrency());
@@ -69,12 +73,20 @@ function App() {
   }, [transactions, currency]);
 
   useEffect(() => {
+    saveCcTransactions(ccTransactions);
+  }, [ccTransactions]);
+
+  useEffect(() => {
     saveInvestments(investments);
   }, [investments]);
 
   useEffect(() => {
     saveBalances(balances);
   }, [balances]);
+
+  useEffect(() => {
+    saveLoans(loans);
+  }, [loans]);
 
   useEffect(() => {
     saveSources(sources);
@@ -105,6 +117,9 @@ function App() {
   const [showTxDeleteConfirm, setShowTxDeleteConfirm] = useState(false);
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('EA_THEME') as 'light' | 'dark') || 'light');
+
+  const ccSectionRef = useRef<HTMLDivElement>(null);
+  const scrollToCc = () => ccSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-bs-theme', theme);
@@ -271,9 +286,11 @@ function App() {
 
   // Unique Categories for Filter Dropdown (Derived from FULL transaction list)
   const allCategories = useMemo(() => {
-    const cats = new Set(transactions.map(t => t.category));
+    const cats = new Set<string>();
+    transactions.forEach(t => cats.add(t.category));
+    ccTransactions.forEach(t => cats.add(t.category));
     return ['All', ...Array.from(cats).sort()];
-  }, [transactions]);
+  }, [transactions, ccTransactions]);
 
   // Expense Card Filter Persistence (Store EXCLUDED categories to handle new ones automatically)
   const [excludedCategories, setExcludedCategories] = useState<Set<string>>(() => {
@@ -442,9 +459,10 @@ function App() {
       const newTransactions: Transaction[] = [];
       let detectedCurrency = currency;
       let newInvestments: Investment[] = [];
+      let newLoans: Loan[] = [];
       const rawTexts: string[] = [];
 
-      // Process JSON Files (No LLM, direct import - skip review? Or review too? User asked for "intermediate step between file upload + LLM parsing", usually imports are trusted. Let's trust JSON for now or just merge them? Spec says "User will review the transactions...". Let's show JSON results in the review preview so they can confirm before merging.)
+      // Process JSON Files (No LLM, direct import - skip review? Or review too? User asked for "intermediate step between file upload + LLM parsing", usually imports are trusted. Let's show JSON results in the review preview so they can confirm before merging.)
       for (const file of jsonFiles) {
         const text = await file.text();
         let data;
@@ -457,6 +475,7 @@ function App() {
         if (validateAppData(data)) {
           newTransactions.push(...data.transactions);
           if (data.investments) newInvestments.push(...data.investments);
+          // JSON loans import support if schema has it? not strictly required yet but good for future.
           if (data.currency) detectedCurrency = data.currency;
         }
       }
@@ -483,6 +502,7 @@ function App() {
 
           const result = await analyzeFinancialText(apiKey, allChunks[i], model);
           newTransactions.push(...result.transactions);
+          if (result.loans) newLoans.push(...result.loans);
           if (result.currency) detectedCurrency = result.currency;
 
           // Capture balances if found (First occurrence takes precedence or last? Let's take last usually implies closing)
@@ -499,13 +519,14 @@ function App() {
       }
 
       // Instead of merging immediately, trigger Review
-      if (newTransactions.length > 0 || newInvestments.length > 0) {
+      if (newTransactions.length > 0 || newInvestments.length > 0 || newLoans.length > 0) {
         setReviewData({
           transactions: newTransactions,
           rawTexts, // Only has PDF texts
           newInvestments,
+          newLoans,
           detectedCurrency,
-          initialBalances: detectedBalances
+          balances: detectedBalances
         });
         setShowReviewModal(true);
       } else {
@@ -542,7 +563,9 @@ function App() {
 
   const handleClearAll = () => {
     setTransactions([]);
+    setCcTransactions([]);
     setInvestments([]);
+    setLoans([]);
     setBalances([]);
     setCurrency('USD');
     clearStorage();
@@ -552,26 +575,35 @@ function App() {
     setInvestments([]);
   };
 
-  const handleClearTransactions = (year?: string, month?: string) => {
-    if (!year && !month) {
-      setTransactions([]); // Clear all
-      return;
-    }
+  const handleClearTransactions = (year?: string, month?: string, accountType: 'all' | 'bank' | 'cc' = 'all') => {
+    // If no year/month provided, we clear ALL (for selected account type)
+    const shouldClearAllDates = !year && !month;
 
-    setTransactions(prev => prev.filter(t => {
+    // Helper to filter function
+    const shouldKeep = (t: Transaction) => {
+      if (shouldClearAllDates) return false; // Delete everything in this list
+
       const d = new Date(t.date);
       const tYear = d.getFullYear().toString();
       const tMonth = (d.getMonth() + 1).toString().padStart(2, '0');
 
       if (year && month) {
-        // Delete if matches BOTH
+        // Keep if NOT matching both
         return !(tYear === year && tMonth === month);
       } else if (year) {
-        // Delete if matches YEAR
+        // Keep if NOT matching year
         return tYear !== year;
       }
       return true;
-    }));
+    };
+
+    if (accountType === 'all' || accountType === 'bank') {
+      setTransactions(prev => prev.filter(shouldKeep));
+    }
+
+    if (accountType === 'all' || accountType === 'cc') {
+      setCcTransactions(prev => prev.filter(shouldKeep));
+    }
   };
 
   const saveKey = (key: string) => {
@@ -591,7 +623,93 @@ function App() {
 
   const cleanBulkModal = () => setBulkModal({ show: false, transaction: null, newCategory: '', matchCountFiltered: 0, matchCountAll: 0 });
 
-  // Update Transaction Helper
+  // CC Filter States
+  const [ccSearchTerm, setCcSearchTerm] = useState('');
+  const [ccCategoryFilter, setCcCategoryFilter] = useState('All');
+  const [ccSelectedYears, setCcSelectedYears] = useState<Set<string>>(new Set());
+  const [ccSelectedMonths, setCcSelectedMonths] = useState<Set<string>>(new Set());
+  const [ccSelectedSources, setCcSelectedSources] = useState<Set<string>>(new Set());
+  const [ccShowDuplicates, setCcShowDuplicates] = useState(false);
+
+  // CC Data Derivation
+  const { availableCcYears, availableCcMonths, availableCcSources } = useMemo(() => {
+    const years = new Set<string>();
+    const months = new Set<string>();
+    const sources = new Set<string>();
+
+    ccTransactions.forEach(t => {
+      const date = new Date(t.date);
+      years.add(date.getFullYear().toString());
+      months.add((date.getMonth() + 1).toString().padStart(2, '0'));
+      if (t.source) sources.add(t.source);
+    });
+
+    return {
+      availableCcYears: Array.from(years).sort(),
+      availableCcMonths: Array.from(months).sort(),
+      availableCcSources: Array.from(sources).sort()
+    };
+  }, [ccTransactions]);
+
+  // Initialize CC filters
+  useEffect(() => {
+    if (availableCcYears.length > 0 && ccSelectedYears.size === 0) setCcSelectedYears(new Set(availableCcYears));
+    if (availableCcMonths.length > 0 && ccSelectedMonths.size === 0) setCcSelectedMonths(new Set(availableCcMonths));
+    if (availableCcSources.length > 0 && ccSelectedSources.size === 0) setCcSelectedSources(new Set(availableCcSources));
+  }, [availableCcYears, availableCcMonths, availableCcSources]);
+
+  // CC Toggle Handlers
+  const toggleCcYear = (y: string) => {
+    const next = new Set(ccSelectedYears);
+    if (next.has(y)) next.delete(y); else next.add(y);
+    setCcSelectedYears(next);
+  };
+  const toggleCcMonth = (m: string) => {
+    const next = new Set(ccSelectedMonths);
+    if (next.has(m)) next.delete(m); else next.add(m);
+    setCcSelectedMonths(next);
+  };
+  const toggleCcSource = (s: string) => {
+    const next = new Set(ccSelectedSources);
+    if (next.has(s)) next.delete(s); else next.add(s);
+    setCcSelectedSources(next);
+  };
+
+  // CC Filtered Transactions
+  const filteredCcTransactions = useMemo(() => {
+    return ccTransactions.filter(t => {
+      const d = new Date(t.date);
+      const y = d.getFullYear().toString();
+      const m = (d.getMonth() + 1).toString().padStart(2, '0');
+      // Year/Month Filter
+      if (!ccSelectedYears.has(y)) return false;
+      if (!ccSelectedMonths.has(m)) return false;
+      // Source Filter
+      if (t.source && !ccSelectedSources.has(t.source)) return false;
+      // Search
+      if (ccSearchTerm && !t.description.toLowerCase().includes(ccSearchTerm.toLowerCase())) return false;
+      // Category
+      if (ccCategoryFilter !== 'All' && t.category !== ccCategoryFilter) return false;
+      // Duplicates (Not implemented yet for CC but standard pattern)
+      return true;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [ccTransactions, ccSelectedYears, ccSelectedMonths, ccSelectedSources, ccSearchTerm, ccCategoryFilter]);
+
+  // Update CC Transaction Helper
+  const handleUpdateCcTransaction = (id: string, field: keyof Transaction, value: any) => {
+    setCcTransactions(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const handleDeleteCcTransaction = (id: string) => {
+    setCcTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Update Loan Helper
+  const handleUpdateLoan = (id: string, field: keyof Loan, value: any) => {
+    setLoans(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
+
+  // Update Single Transaction (Existing Helper - Updated to be explicit for Bank Tx if needed, but it uses setTransactions so it is fine)
   const updateSingleTransaction = (id: string, field: keyof Transaction, value: any) => {
     setTransactions(prev => prev.map(t => {
       if (t.id !== id) return t;
@@ -692,14 +810,16 @@ function App() {
     });
   };
 
-  // Review Modal State Update
+
+
   const [reviewData, setReviewData] = useState<{
-    transactions: Transaction[],
-    rawTexts: string[],
-    newInvestments: Investment[],
-    detectedCurrency: string,
-    initialBalances?: { opening: number, closing: number },
-    initialPeriod?: { month: string, year: string }
+    transactions: Transaction[];
+    rawTexts: string[];
+    newInvestments: Investment[];
+    newLoans?: Loan[];
+    detectedCurrency: string;
+    balances?: { opening: number, closing: number };
+    statement_period?: { month: string, year: string };
   } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
@@ -718,6 +838,7 @@ function App() {
 
     try {
       const newTransactions: Transaction[] = [];
+      const newLoans: Loan[] = [];
       const chunks = reviewData.rawTexts;
 
       for (let i = 0; i < chunks.length; i++) {
@@ -726,6 +847,7 @@ function App() {
 
         const result = await analyzeFinancialText(apiKey, chunks[i], model, feedback);
         newTransactions.push(...result.transactions);
+        if (result.loans) newLoans.push(...result.loans);
 
         // Should we update balances here? If user corrects prompt, maybe balances appear?
         // Let's defer that for now.
@@ -736,7 +858,7 @@ function App() {
         }));
       }
 
-      setReviewData(prev => prev ? { ...prev, transactions: newTransactions } : null);
+      setReviewData(prev => prev ? { ...prev, transactions: newTransactions, newLoans } : null);
     } catch (err: any) {
       console.error(err);
       setError({ title: "Refinement Failed", message: err.message });
@@ -745,7 +867,7 @@ function App() {
     }
   };
 
-  const handleReviewApprove = (approvedTx: Transaction[], newSources: string[], newBalance?: StatementBalance) => {
+  const handleReviewApprove = (approvedTx: Transaction[], newSources: string[], newBalance?: StatementBalance, accountType: 'bank' | 'cc' = 'bank', approvedLoans?: Loan[]) => {
     if (!reviewData) return;
 
     if (newSources && newSources.length > 0) {
@@ -761,7 +883,16 @@ function App() {
       });
     }
 
-    setTransactions(prev => mergeTransactions(prev, approvedTx));
+    if (accountType === 'cc') {
+      setCcTransactions(prev => mergeTransactions(prev, approvedTx));
+    } else {
+      setTransactions(prev => mergeTransactions(prev, approvedTx));
+    }
+
+    if (approvedLoans && approvedLoans.length > 0) {
+      setLoans(prev => mergeLoans(prev, approvedLoans));
+    }
+
     setInvestments(prev => mergeInvestments(prev, reviewData.newInvestments));
 
     // Save Balance if provided
@@ -866,7 +997,7 @@ function App() {
                 {showKeyInput ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </Button>
 
-              {transactions.length > 0 && (
+              {(transactions.length > 0 || ccTransactions.length > 0 || investments.length > 0) && (
                 <>
                   <Button
                     variant={showUpload ? "light" : "primary"}
@@ -949,7 +1080,7 @@ function App() {
         </Collapse>
 
         {/* Empty State / Hero */}
-        {transactions.length === 0 ? (
+        {transactions.length === 0 && ccTransactions.length === 0 && investments.length === 0 ? (
           <Row className="justify-content-center mt-5">
             <Col md={6} lg={5} className="text-center">
               <h1 className="display-4 fw-bold mb-3">Financial Clarity</h1>
@@ -990,6 +1121,7 @@ function App() {
               onToggleSource={toggleSource}
               onSelectAllSources={selectAllSources}
               onDeselectAllSources={deselectAllSources}
+              onScrollToCreditCards={ccTransactions.length > 0 ? scrollToCc : undefined}
             />
 
             {/* Balances */}
@@ -1052,6 +1184,63 @@ function App() {
                 />
               </Col>
             </Row>
+
+            {/* Credit Card Dashboard */}
+            {ccTransactions.length > 0 && (
+              <div ref={ccSectionRef} className="mt-5 pt-4 border-top">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h3 className="fw-bold text-primary mb-1">Credit Card Analysis</h3>
+                    <p className="text-muted mb-0">Review and analyze your credit card spending separately.</p>
+                  </div>
+                </div>
+
+                <DashboardControls
+                  availableYears={availableCcYears}
+                  availableMonths={availableCcMonths}
+                  selectedYears={ccSelectedYears}
+                  selectedMonths={ccSelectedMonths}
+                  onToggleYear={toggleCcYear}
+                  onToggleMonth={toggleCcMonth}
+                  onSelectAllYears={() => setCcSelectedYears(new Set(availableCcYears))}
+                  onDeselectAllYears={() => setCcSelectedYears(new Set())}
+                  onSelectAllMonths={() => setCcSelectedMonths(new Set(availableCcMonths))}
+                  onDeselectAllMonths={() => setCcSelectedMonths(new Set())}
+                  availableSources={availableCcSources}
+                  selectedSources={ccSelectedSources}
+                  onToggleSource={toggleCcSource}
+                  onSelectAllSources={() => setCcSelectedSources(new Set(availableCcSources))}
+                  onDeselectAllSources={() => setCcSelectedSources(new Set())}
+                />
+
+                <Row className="g-3">
+                  <Col lg={12}>
+                    <ExpenseCharts
+                      transactions={filteredCcTransactions.filter(t => t.category !== 'Not an expense')}
+                      currency={currency}
+                      hideHorizontal={true}
+                    />
+                    <TransactionTable
+                      transactions={filteredCcTransactions}
+                      currency={currency}
+                      onUpdateTransaction={handleUpdateCcTransaction}
+                      searchTerm={ccSearchTerm}
+                      onSearchChange={setCcSearchTerm}
+                      categoryFilter={ccCategoryFilter}
+                      onCategoryChange={setCcCategoryFilter}
+                      allCategories={allCategories}
+                      onDeleteTransaction={handleDeleteCcTransaction}
+                      showDuplicates={ccShowDuplicates}
+                      onToggleDuplicates={() => setCcShowDuplicates(!ccShowDuplicates)}
+                      onAddTransaction={() => { }} // Manual add not strictly requested, keep simple
+                      sources={sources} // Allow picking from all sources when editing/adding? Or just CC sources? Use global sources for consistency.
+                      onSourceCreate={handleSourceCreate}
+                    />
+                  </Col>
+                </Row>
+              </div>
+            )}
+
           </>
         )}
       </Container>
@@ -1072,17 +1261,37 @@ function App() {
       {/* Review Modal */}
       <ReviewModal
         show={showReviewModal}
-        onHide={handleReviewCancel} // Clicking backdrop cancels (or we can enforce specific button, user said "Cancel then ... permanently")
+        onHide={() => {
+          if (!processingStatus.isActive) {
+            setShowReviewModal(false);
+            setReviewData(null);
+          }
+        }}
         transactions={reviewData?.transactions || []}
-        currency={reviewData?.detectedCurrency || currency}
-        processingStatus={processingStatus} // New Prop
+        loans={reviewData?.newLoans}
+        currency={currency}
+        processingStatus={processingStatus}
         onApprove={handleReviewApprove}
         onCancel={handleReviewCancel}
         onRedo={handleReviewRedo}
         sources={sources}
-        initialBalances={reviewData?.initialBalances}
-        initialPeriod={reviewData?.initialPeriod}
+        initialBalances={reviewData?.balances}
+        initialPeriod={reviewData?.statement_period}
       />
+
+      {/* Active Loans Section */}
+      {loans.length > 0 && (
+        <Container className="pb-5">
+          <div className="mt-5 pt-4 border-top">
+            <LoanTable
+              loans={loans}
+              currency={currency}
+              onUpdate={handleUpdateLoan}
+              onDelete={(id) => setLoans(prev => prev.filter(l => l.id !== id))}
+            />
+          </div>
+        </Container>
+      )}
 
       {/* Global Processing Overlay (for initial file load) */}
       <Modal show={processingStatus.isActive && !showReviewModal} centered backdrop="static" keyboard={false}>
@@ -1118,6 +1327,9 @@ function App() {
           }}>Delete Permanently</Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Scroll To Top Button */}
+      <ScrollToTop />
     </div>
   );
 }

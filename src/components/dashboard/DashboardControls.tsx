@@ -1,5 +1,5 @@
 import { Dropdown, Form, Button } from 'react-bootstrap';
-import { Filter } from 'lucide-react';
+import { Filter, CreditCard } from 'lucide-react';
 
 interface DashboardControlsProps {
     availableYears: string[];
@@ -14,9 +14,10 @@ interface DashboardControlsProps {
     onDeselectAllMonths: () => void;
     availableSources: string[];
     selectedSources: Set<string>;
-    onToggleSource: (source: string) => void;
     onSelectAllSources: () => void;
     onDeselectAllSources: () => void;
+    onToggleSource: (source: string) => void;
+    onScrollToCreditCards?: () => void;
 }
 
 const ALL_MONTHS = [
@@ -41,11 +42,24 @@ export function DashboardControls({
     selectedSources,
     onToggleSource,
     onSelectAllSources,
-    onDeselectAllSources
+    onDeselectAllSources,
+    onScrollToCreditCards
 }: DashboardControlsProps) {
 
     return (
         <div className="d-flex justify-content-end mb-3 gap-2 flex-wrap">
+            {onScrollToCreditCards && (
+                <Button
+                    variant="outline-primary"
+                    size="sm"
+                    className="d-flex align-items-center bg-body shadow-sm"
+                    onClick={onScrollToCreditCards}
+                >
+                    <CreditCard size={14} className="me-2" />
+                    Go to Credit Cards
+                </Button>
+            )}
+
             {/* Source Filter */}
             <Dropdown autoClose="outside">
                 <Dropdown.Toggle variant="outline-secondary" size="sm" className="d-flex align-items-center bg-body shadow-sm border">

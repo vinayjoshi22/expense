@@ -40,6 +40,7 @@ export interface AppError {
 export interface AnalysisResult {
     currency: string;
     transactions: Transaction[];
+    loans?: Loan[];
     balances?: {
         opening: number;
         closing: number;
@@ -68,11 +69,35 @@ export interface Investment {
     currency: string;
 }
 
+export interface Loan {
+    id: string;
+    description: string;
+    totalAmount: number;
+    remainingAmount: number;
+    installmentAmount: number; // EMI
+    remainingInstallments: number; // e.g. "5 of 12" -> 7 remaining
+    source: string; // The statement it came from
+}
+
 export interface AppState {
     apiKey: string | null;
     transactions: Transaction[];
     investments: Investment[];
+    loans: Loan[];
     currency: string;
     isProcessing: boolean;
     error: AppError | null;
 }
+
+export interface AppData {
+    transactions: Transaction[];
+    creditCardTransactions?: Transaction[];
+    investments: Investment[];
+    loans?: Loan[]; // New
+    currency: string;
+    sources: string[];
+    balances?: StatementBalance[];
+    version: number;
+}
+
+

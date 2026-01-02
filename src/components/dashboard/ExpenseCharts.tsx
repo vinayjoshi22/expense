@@ -7,9 +7,10 @@ import { formatCurrency, formatCompactNumber } from '../../lib/utils';
 interface ExpenseChartsProps {
     transactions: Transaction[];
     currency: string;
+    hideHorizontal?: boolean;
 }
 
-export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
+export function ExpenseCharts({ transactions, currency, hideHorizontal }: ExpenseChartsProps) {
     // Note: transactions passed here are already filtered by the parent App component
 
     // Process Data for Category Chart (Dual Axis)
@@ -59,11 +60,13 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
         );
     }
 
+    const colClass = hideHorizontal ? "col-lg-6" : "col-lg-4";
+
     return (
         <div className="mb-3">
             <div className="row g-4">
                 {/* Category Breakdown (Dual Axis) */}
-                <div className="col-lg-4">
+                <div className={colClass}>
                     <Card className="shadow-sm h-100 bg-body">
                         <Card.Header className="bg-body py-3 fw-bold text-secondary">Expense Breakdown</Card.Header>
                         <Card.Body>
@@ -92,7 +95,7 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
                 </div>
 
                 {/* Monthly Trends */}
-                <div className="col-lg-4">
+                <div className={colClass}>
                     <Card className="shadow-sm h-100 bg-body">
                         <Card.Header className="bg-body py-3 fw-bold text-secondary">Cash Flow Trends</Card.Header>
                         <Card.Body>
@@ -114,37 +117,39 @@ export function ExpenseCharts({ transactions, currency }: ExpenseChartsProps) {
                 </div>
 
                 {/* Horizontal Category Breakdown */}
-                <div className="col-lg-4">
-                    <Card className="shadow-sm h-100 bg-body">
-                        <Card.Header className="bg-body py-3 fw-bold text-secondary">Expense (Horizontal)</Card.Header>
-                        <Card.Body>
-                            <div style={{ width: '100%', height: 300 }}>
-                                <ResponsiveContainer>
-                                    <ComposedChart
-                                        data={categoryData}
-                                        layout="vertical"
-                                        margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                        <XAxis type="number" xAxisId="left" tickFormatter={(v) => formatCompactNumber(v)} />
-                                        <XAxis type="number" xAxisId="right" orientation="top" unit="%" domain={[0, 100]} hide />
-                                        <YAxis dataKey="name" type="category" width={80} />
-                                        <RechartsTooltip
-                                            formatter={(value: any, name: any) => {
-                                                if (name === 'Amount') return formatCurrency(Number(value), currency);
-                                                if (name === 'Share') return `${value}%`;
-                                                return value;
-                                            }}
-                                        />
-                                        <Legend />
-                                        <Bar xAxisId="left" dataKey="value" name="Amount" fill="#6610f2" barSize={20} />
-                                        <Line xAxisId="right" type="monotone" dataKey="percentage" name="Share" stroke="#ffc107" strokeWidth={2} dot={{ r: 4 }} />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </Card.Body>
-                    </Card>
-                </div>
+                {!hideHorizontal && (
+                    <div className="col-lg-4">
+                        <Card className="shadow-sm h-100 bg-body">
+                            <Card.Header className="bg-body py-3 fw-bold text-secondary">Expense (Horizontal)</Card.Header>
+                            <Card.Body>
+                                <div style={{ width: '100%', height: 300 }}>
+                                    <ResponsiveContainer>
+                                        <ComposedChart
+                                            data={categoryData}
+                                            layout="vertical"
+                                            margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" xAxisId="left" tickFormatter={(v) => formatCompactNumber(v)} />
+                                            <XAxis type="number" xAxisId="right" orientation="top" unit="%" domain={[0, 100]} hide />
+                                            <YAxis dataKey="name" type="category" width={80} />
+                                            <RechartsTooltip
+                                                formatter={(value: any, name: any) => {
+                                                    if (name === 'Amount') return formatCurrency(Number(value), currency);
+                                                    if (name === 'Share') return `${value}%`;
+                                                    return value;
+                                                }}
+                                            />
+                                            <Legend />
+                                            <Bar xAxisId="left" dataKey="value" name="Amount" fill="#6610f2" barSize={20} />
+                                            <Line xAxisId="right" type="monotone" dataKey="percentage" name="Share" stroke="#ffc107" strokeWidth={2} dot={{ r: 4 }} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </Card.Body>
+                        </Card>
+                    </div>
+                )}
             </div>
         </div>
     );

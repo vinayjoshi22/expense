@@ -27,7 +27,7 @@ export function ProcessingOverlay({ status }: ProcessingOverlayProps) {
         return () => clearInterval(interval);
     }, [status.isActive, status.startTime]);
 
-    const progress = Math.round(((status.currentBatch - 1) / status.totalBatches) * 100);
+    const progress = status.totalBatches > 0 ? Math.round(((status.currentBatch - 1) / status.totalBatches) * 100) : 0;
 
     return (
         <div className="text-center p-4">

@@ -100,7 +100,7 @@ export const SourceSelect = ({ value, sources, onSelect, onCreate, placeholder =
             }
         >
             <div
-                className={`form-control form-control-sm d-flex align-items-center justify-content-between cursor-pointer bg-transparent border-0 p-0 ${className}`}
+                className={`form-control form-control-sm d-flex align-items-center justify-content-between cursor-pointer ${className}`}
                 style={{ cursor: 'pointer', minHeight: '31px' }}
             >
                 <span className={value ? "text-body" : "text-muted"}>

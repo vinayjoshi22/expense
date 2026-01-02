@@ -40,6 +40,23 @@ export interface AppError {
 export interface AnalysisResult {
     currency: string;
     transactions: Transaction[];
+    balances?: {
+        opening: number;
+        closing: number;
+    };
+    statement_period?: {
+        month: string; // MM
+        year: string; // YYYY
+    };
+}
+
+export interface StatementBalance {
+    id: string;
+    source: string;
+    month: string; // MM
+    year: string; // YYYY
+    openingBalance: number;
+    closingBalance: number;
 }
 
 export interface Investment {

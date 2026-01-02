@@ -11,13 +11,18 @@ export const analyzeFinancialText = async (apiKey: string, text: string, modelNa
   let prompt = `
     You are an expert financial analyst. Analyze the following bank statement text and extract all transactions.
     
-    1. **Currency Detection**: Look for currency symbols ($, £, €, ₹) or location clues (e.g., "London" -> GBP, "Mumbai" -> INR, "New York" -> USD). Default to USD if unsure.
-    2. **Extraction**: Identify Date (ISO YYYY-MM-DD), Description, Amount (absolute number), Type (only 'credit' or 'debit'), and Category.
-    3. **Categories**: 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Utilities', 'Travel', 'Transfer', 'Income', 'Other'.
+    1. **Currency Detection**: Look for currency symbols ($, £, €, ₹) or location clues. Default to USD if unsure.
+    2. **Statement Period**: Identify the COVERAGE PERIOD of the statement. Extract the Month (MM) and Year (YYYY). If it covers multiple months, choose the END month.
+    3. **Balances**: Look for "Opening Balance" (or 'Start Balance', 'Previous Balance', 'Brought Forward') and "Closing Balance" (or 'End Balance', 'New Balance', 'Carried Forward').
+    4. **Transactions**: Identify Date (ISO YYYY-MM-DD), Description, Amount (absolute number), Type ('credit' = deposit/return, 'debit' = expense/payment), and Category.
+    5. **Categories**: 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Utilities', 'Travel', 'Transfer', 'Income', 'Other'.
     
     Output JSON Format:
     {
       "currency": "USD",
+      "statement_period": { "month": "10", "year": "2023" },
+      "opening_balance": 1000.00,
+      "closing_balance": 1500.00,
       "transactions": [
         { "date": "2023-10-01", "description": "Starbucks", "amount": 5.50, "type": "debit", "category": "Food" }
       ]
@@ -61,7 +66,15 @@ export const analyzeFinancialText = async (apiKey: string, text: string, modelNa
 
     return {
       currency: data.currency || 'USD',
-      transactions
+      transactions,
+      balances: (data.opening_balance !== undefined && data.closing_balance !== undefined && data.opening_balance !== null && data.closing_balance !== null) ? {
+        opening: Number(data.opening_balance),
+        closing: Number(data.closing_balance)
+      } : undefined,
+      statement_period: (data.statement_period && data.statement_period.month && data.statement_period.year) ? {
+        month: String(data.statement_period.month).padStart(2, '0'),
+        year: String(data.statement_period.year)
+      } : undefined
     };
 
   } catch (error: any) {

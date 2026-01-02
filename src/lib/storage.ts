@@ -54,6 +54,7 @@ export const clearStorage = () => {
     localStorage.removeItem(CURRENCY_KEY);
     localStorage.removeItem(INVESTMENTS_KEY);
     localStorage.removeItem(SOURCES_KEY);
+    localStorage.removeItem(BALANCES_KEY);
 };
 
 export const saveInvestments = (investments: any[]) => {
@@ -126,4 +127,51 @@ export const mergeInvestments = (existing: any[], incoming: any[]): any[] => {
 
     console.log(`Merged ${incoming.length} incoming investments. Added ${newCount} new unique records.`);
     return Array.from(map.values());
+};
+
+const BALANCES_KEY = 'EA_BALANCES_V1';
+
+export const saveBalances = (balances: any[]) => {
+    try {
+        localStorage.setItem(BALANCES_KEY, JSON.stringify(balances));
+    } catch (e) {
+        console.error("Failed to save balances", e);
+    }
+};
+
+export const loadBalances = (): any[] => {
+    try {
+        const raw = localStorage.getItem(BALANCES_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error("Failed to load balances", e);
+        return [];
+    }
+};
+
+export const mergeBalances = (existing: any[], incoming: any[]): any[] => {
+    const map = new Map<string, any>();
+
+    // Helper to generate unique key: Source|Year|Month
+    const getKey = (b: any) => `${b.source}|${b.year}|${b.month}`;
+
+    // 1. Load existing
+    existing.forEach(b => {
+        map.set(getKey(b), b);
+    });
+
+    // 2. Merge incoming (overwrite existing for same period)
+    let newCount = 0;
+    incoming.forEach(b => {
+        const key = getKey(b);
+        if (!map.has(key)) newCount++;
+        // Always overwrite with latest analysis for this specific statement period
+        map.set(key, b);
+    });
+
+    console.log(`Merged ${incoming.length} incoming balances. Updated records.`);
+    return Array.from(map.values()).sort((a, b) => {
+        // Sort by Date Descending
+        return (parseInt(b.year) * 12 + parseInt(b.month)) - (parseInt(a.year) * 12 + parseInt(a.month));
+    });
 };

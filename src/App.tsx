@@ -7,8 +7,9 @@ import { TransactionTable } from './components/dashboard/TransactionList';
 import { ErrorAlert } from './components/ui/ErrorAlert';
 import { parseFile } from './lib/parser';
 import { analyzeFinancialText, fetchAvailableModels } from './lib/llm';
-import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments, loadSources, saveSources } from './lib/storage';
-import type { Transaction, AppError, Investment } from './types';
+import { BalanceCards } from './components/dashboard/BalanceCards';
+import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTransactions, clearStorage, loadInvestments, saveInvestments, mergeInvestments, loadSources, saveSources, loadBalances, saveBalances, mergeBalances } from './lib/storage';
+import type { Transaction, AppError, Investment, StatementBalance } from './types';
 import { validateAppData, type AppData } from './lib/validator';
 import { saveAs } from 'file-saver';
 import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download, Moon, Sun } from 'lucide-react';
@@ -24,6 +25,7 @@ import { ProcessingOverlay, type ProcessingStatus } from './components/ui/Proces
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
   const [investments, setInvestments] = useState<Investment[]>(() => loadInvestments());
+  const [balances, setBalances] = useState<StatementBalance[]>(() => loadBalances());
 
   const [currency, setCurrency] = useState<string>(() => loadCurrency());
   const [sources, setSources] = useState<string[]>(() => loadSources());
@@ -69,6 +71,10 @@ function App() {
   useEffect(() => {
     saveInvestments(investments);
   }, [investments]);
+
+  useEffect(() => {
+    saveBalances(balances);
+  }, [balances]);
 
   useEffect(() => {
     saveSources(sources);
@@ -342,6 +348,68 @@ function App() {
   const deselectAllInvestmentCategories = () => setIncludedInvestmentCategories(new Set());
 
 
+  // Calculate Displayed Balances based on Filter
+  const displayedBalances = useMemo(() => {
+    // 1. Determine Date Range
+    let activeMonths: { year: string, month: string }[] = [];
+
+    // If no months selected, use ALL available months
+    const monthsToConsider = selectedMonths.size > 0
+      ? Array.from(selectedMonths)
+      : availableMonths;
+
+    const yearsToConsider = selectedYears.size > 0
+      ? Array.from(selectedYears)
+      : availableYears;
+
+    // effective list of periods sorted chronologically
+    yearsToConsider.forEach(y => {
+      monthsToConsider.forEach(m => {
+        // Basic cross product, but really we should check if data exists? 
+        // Actually, simplest is just to filter the stored 'balances' list by the selected filters.
+        activeMonths.push({ year: y, month: m });
+      });
+    });
+
+    if (activeMonths.length === 0) return { opening: 0, closing: 0 };
+
+    // Sort active periods
+    activeMonths.sort((a, b) => {
+      const valA = parseInt(a.year) * 12 + parseInt(a.month);
+      const valB = parseInt(b.year) * 12 + parseInt(b.month);
+      return valA - valB;
+    });
+
+    const startPeriod = activeMonths[0]; // Earliest selected
+    const endPeriod = activeMonths[activeMonths.length - 1]; // Latest selected
+
+    // 2. Sum Balances for Selected Sources
+    const relevantSources = selectedSources.size > 0 ? selectedSources : new Set(availableSources);
+
+    let openingTotal = 0;
+    let closingTotal = 0;
+
+    // Opening Balance = Sum of opening balances for all relevant sources in the START period
+    const startBalances = balances.filter(b =>
+      b.year === startPeriod.year &&
+      b.month === startPeriod.month &&
+      relevantSources.has(b.source)
+    );
+    // If a source is missing a balance for this period, it contributes 0 (or should we look back? No, simplify for now)
+    openingTotal = startBalances.reduce((sum, b) => sum + b.openingBalance, 0);
+
+    // Closing Balance = Sum of closing balances for all relevant sources in the END period
+    const endBalances = balances.filter(b =>
+      b.year === endPeriod.year &&
+      b.month === endPeriod.month &&
+      relevantSources.has(b.source)
+    );
+    closingTotal = endBalances.reduce((sum, b) => sum + b.closingBalance, 0);
+
+    return { opening: openingTotal, closing: closingTotal };
+  }, [balances, selectedMonths, selectedYears, selectedSources, availableMonths, availableYears, availableSources]);
+
+
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
     isActive: false,
     currentBatch: 0,
@@ -393,6 +461,8 @@ function App() {
         }
       }
 
+      let detectedBalances: { opening: number, closing: number } | undefined = undefined;
+
       // Process PDF Files
       if (pdfFiles.length > 0) {
         // First, get all chunks to know total batches
@@ -415,6 +485,11 @@ function App() {
           newTransactions.push(...result.transactions);
           if (result.currency) detectedCurrency = result.currency;
 
+          // Capture balances if found (First occurrence takes precedence or last? Let's take last usually implies closing)
+          if (result.balances) {
+            detectedBalances = result.balances;
+          }
+
           // Log completion
           setProcessingStatus(prev => ({
             ...prev,
@@ -429,7 +504,8 @@ function App() {
           transactions: newTransactions,
           rawTexts, // Only has PDF texts
           newInvestments,
-          detectedCurrency
+          detectedCurrency,
+          initialBalances: detectedBalances
         });
         setShowReviewModal(true);
       } else {
@@ -467,6 +543,7 @@ function App() {
   const handleClearAll = () => {
     setTransactions([]);
     setInvestments([]);
+    setBalances([]);
     setCurrency('USD');
     clearStorage();
   };
@@ -521,12 +598,13 @@ function App() {
 
       const updates: Partial<Transaction> = { [field]: value };
 
-      // Auto-update type if category changes to/from Income
+      // Auto-update type if category changes
       if (field === 'category') {
         if (value === 'Income') {
           updates.type = 'credit';
-        } else if (t.category === 'Income' && value !== 'Income') {
-          // If moving AWAY from Income, revert to debit (default assumption for expenses)
+        } else if (t.type === 'credit') {
+          // If currently Credit (Green) and changing to non-Income, revert to Debit (Red)
+          // This handles cases where LLM incorrectly mistakenly marked an expense as income
           updates.type = 'debit';
         }
       }
@@ -614,16 +692,24 @@ function App() {
     });
   };
 
-  // ... (ReviewModal State)
-  const [reviewData, setReviewData] = useState<{ transactions: Transaction[], rawTexts: string[], newInvestments: Investment[], detectedCurrency: string } | null>(null);
+  // Review Modal State Update
+  const [reviewData, setReviewData] = useState<{
+    transactions: Transaction[],
+    rawTexts: string[],
+    newInvestments: Investment[],
+    detectedCurrency: string,
+    initialBalances?: { opening: number, closing: number },
+    initialPeriod?: { month: string, year: string }
+  } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
-  // Redo Analysis with Feedback
+  // Redo Analysis with Feedback (No Balance Update needed here usually, but if re-analysis finds it? Maybe. Keep simple for now)
   const handleReviewRedo = async (feedback: string) => {
+    // ... (Existing logic same)
     if (!reviewData) return;
 
     setProcessingStatus({
-      isActive: true,
+      isActive: true, // ...
       currentBatch: 1,
       totalBatches: reviewData.rawTexts.length,
       completedBatches: [],
@@ -641,6 +727,9 @@ function App() {
         const result = await analyzeFinancialText(apiKey, chunks[i], model, feedback);
         newTransactions.push(...result.transactions);
 
+        // Should we update balances here? If user corrects prompt, maybe balances appear?
+        // Let's defer that for now.
+
         setProcessingStatus(prev => ({
           ...prev,
           completedBatches: [...prev.completedBatches, { batchNum: i + 1, timeMs: Date.now() - batchStart }]
@@ -656,7 +745,7 @@ function App() {
     }
   };
 
-  const handleReviewApprove = (approvedTx: Transaction[], newSources: string[]) => {
+  const handleReviewApprove = (approvedTx: Transaction[], newSources: string[], newBalance?: StatementBalance) => {
     if (!reviewData) return;
 
     if (newSources && newSources.length > 0) {
@@ -674,6 +763,12 @@ function App() {
 
     setTransactions(prev => mergeTransactions(prev, approvedTx));
     setInvestments(prev => mergeInvestments(prev, reviewData.newInvestments));
+
+    // Save Balance if provided
+    if (newBalance) {
+      setBalances(prev => mergeBalances(prev, [newBalance]));
+    }
+
     setCurrency(reviewData.detectedCurrency);
 
     setReviewData(null);
@@ -687,13 +782,16 @@ function App() {
   };
 
   // Calculations (Use filteredTransactions)
-  const totalIncome = filteredTransactions.filter((t: Transaction) => t.type === 'credit').reduce((a: number, b: Transaction) => a + b.amount, 0);
+  const totalIncome = filteredTransactions.filter((t: Transaction) => t.type === 'credit').reduce((a: number, b: Transaction) => a + b.amount, 0) + displayedBalances.opening;
 
   const handleSourceCreate = (newSource: string) => {
     if (!sources.includes(newSource)) {
       setSources(prev => [...prev, newSource].sort());
     }
   };
+
+
+
 
   // Standard Expense (Used for Charts - All categories) -> Logic resides in charts/table components directly via filteredTransactions
 
@@ -894,6 +992,15 @@ function App() {
               onDeselectAllSources={deselectAllSources}
             />
 
+            {/* Balances */}
+            {balances.length > 0 && (
+              <BalanceCards
+                openingBalance={displayedBalances.opening}
+                closingBalance={displayedBalances.closing}
+                currency={currency}
+              />
+            )}
+
             {/* Dashboard */}
             <SummaryCards
               income={totalIncome}
@@ -973,6 +1080,8 @@ function App() {
         onCancel={handleReviewCancel}
         onRedo={handleReviewRedo}
         sources={sources}
+        initialBalances={reviewData?.initialBalances}
+        initialPeriod={reviewData?.initialPeriod}
       />
 
       {/* Global Processing Overlay (for initial file load) */}

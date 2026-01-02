@@ -92,8 +92,7 @@ export function ReviewModal({
     }, [show, initialPeriod, initialBalances, transactions]);
 
     // Valid Years (last 10 years)
-    const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString());
-    const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+
 
     // Derived source options (prop sources + newly created in this session)
     const availableSources = [...sources, ...newSourcesToAdd].sort();

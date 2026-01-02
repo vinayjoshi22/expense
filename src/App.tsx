@@ -963,7 +963,7 @@ function App() {
             {/* Upload Tray */}
             <Collapse in={showUpload}>
               <div>
-                <div className="bg-light border rounded p-3 mb-4 position-relative">
+                <div className="bg-body-tertiary border rounded p-3 mb-4 position-relative">
                   <div className="d-flex justify-content-between mb-2">
                     <h6 className="fw-bold text-primary">Add More Statements</h6>
                     <Button variant="close" size="sm" onClick={() => setShowUpload(false)} />

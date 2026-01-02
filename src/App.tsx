@@ -114,6 +114,7 @@ function App() {
 
   // Transaction Delete Logic
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<'bank' | 'cc'>('bank');
   const [showTxDeleteConfirm, setShowTxDeleteConfirm] = useState(false);
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('EA_THEME') as 'light' | 'dark') || 'light');
@@ -130,18 +131,28 @@ function App() {
 
   const [dontAskDeleteAgain, setDontAskDeleteAgain] = useState(() => localStorage.getItem('EA_SKIP_DELETE_WARNING') === 'true');
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = (id: string, type: 'bank' | 'cc' = 'bank') => {
     if (dontAskDeleteAgain) {
-      setTransactions(prev => prev.filter(t => t.id !== id));
+      if (type === 'cc') {
+        setCcTransactions(prev => prev.filter(t => t.id !== id));
+      } else {
+        setTransactions(prev => prev.filter(t => t.id !== id));
+      }
     } else {
       setDeleteId(id);
+      setDeleteTarget(type);
       setShowTxDeleteConfirm(true);
     }
   };
 
   const confirmTxDelete = (skipFuture: boolean) => {
     if (deleteId) {
-      setTransactions(prev => prev.filter(t => t.id !== deleteId));
+      if (deleteTarget === 'cc') {
+        setCcTransactions(prev => prev.filter(t => t.id !== deleteId));
+      } else {
+        setTransactions(prev => prev.filter(t => t.id !== deleteId));
+      }
+
       if (skipFuture) {
         localStorage.setItem('EA_SKIP_DELETE_WARNING', 'true');
         setDontAskDeleteAgain(true);
@@ -700,9 +711,7 @@ function App() {
     setCcTransactions(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
   };
 
-  const handleDeleteCcTransaction = (id: string) => {
-    setCcTransactions(prev => prev.filter(t => t.id !== id));
-  };
+
 
   // Update Loan Helper
   const handleUpdateLoan = (id: string, field: keyof Loan, value: any) => {
@@ -1229,7 +1238,7 @@ function App() {
                       categoryFilter={ccCategoryFilter}
                       onCategoryChange={setCcCategoryFilter}
                       allCategories={allCategories}
-                      onDeleteTransaction={handleDeleteCcTransaction}
+                      onDeleteTransaction={(id) => handleDeleteTransaction(id, 'cc')}
                       showDuplicates={ccShowDuplicates}
                       onToggleDuplicates={() => setCcShowDuplicates(!ccShowDuplicates)}
                       onAddTransaction={() => { }} // Manual add not strictly requested, keep simple

@@ -413,28 +413,65 @@ function App() {
     const startPeriod = activeMonths[0]; // Earliest selected
     const endPeriod = activeMonths[activeMonths.length - 1]; // Latest selected
 
-    // 2. Sum Balances for Selected Sources
-    const relevantSources = selectedSources.size > 0 ? selectedSources : new Set(availableSources);
+    // 2. Sum Balances for Selected Sources with Carry Forward Logic
+    const relevantSources = selectedSources.size > 0 ? Array.from(selectedSources) : availableSources;
 
     let openingTotal = 0;
     let closingTotal = 0;
 
-    // Opening Balance = Sum of opening balances for all relevant sources in the START period
-    const startBalances = balances.filter(b =>
-      b.year === startPeriod.year &&
-      b.month === startPeriod.month &&
-      relevantSources.has(b.source)
-    );
-    // If a source is missing a balance for this period, it contributes 0 (or should we look back? No, simplify for now)
-    openingTotal = startBalances.reduce((sum, b) => sum + b.openingBalance, 0);
+    // Helper to get value of a month (YYYY * 12 + MM) for easy comparison
+    const getMonthValue = (y: string, m: string) => parseInt(y) * 12 + parseInt(m);
 
-    // Closing Balance = Sum of closing balances for all relevant sources in the END period
-    const endBalances = balances.filter(b =>
-      b.year === endPeriod.year &&
-      b.month === endPeriod.month &&
-      relevantSources.has(b.source)
-    );
-    closingTotal = endBalances.reduce((sum, b) => sum + b.closingBalance, 0);
+    relevantSources.forEach(source => {
+      // Get all balances for this source, sorted by date
+      const sourceBalances = balances
+        .filter(b => b.source === source)
+        .sort((a, b) => getMonthValue(a.year, a.month) - getMonthValue(b.year, b.month));
+
+      if (sourceBalances.length === 0) return;
+
+      const startVal = getMonthValue(startPeriod.year, startPeriod.month);
+      const endVal = getMonthValue(endPeriod.year, endPeriod.month);
+
+      // --- OPENING BALANCE ---
+      // Try to find exact match for start period
+      const exactStart = sourceBalances.find(b => getMonthValue(b.year, b.month) === startVal);
+      if (exactStart) {
+        openingTotal += exactStart.openingBalance;
+      } else {
+        // Find latest balance BEFORE start period
+        // Since list is sorted, we can iterate backwards or findLast (if avail)
+        for (let i = sourceBalances.length - 1; i >= 0; i--) {
+          const bVal = getMonthValue(sourceBalances[i].year, sourceBalances[i].month);
+          if (bVal < startVal) {
+            // Carry forward closing balance of previous period as opening of current
+            openingTotal += sourceBalances[i].closingBalance;
+            break;
+          }
+        }
+        // If not found (no historical data before start), assume 0
+      }
+
+      // --- CLOSING BALANCE ---
+      // Try to find exact match for end period
+      const exactEnd = sourceBalances.find(b => getMonthValue(b.year, b.month) === endVal);
+      if (exactEnd) {
+        closingTotal += exactEnd.closingBalance;
+      } else {
+        // Find latest balance BEFORE OR AT end period (but if exact matched above, we wouldn't be here)
+        // Actually, if we selected a range [Jan, Feb, Mar], and we have data for Jan.. but nothing for Mar.
+        // The closing balance should be the closing balance of the latest known entry <= Mar.
+        // So effectively, find the latest entry where date <= endPeriod.
+        // Note: Use closingBalance of that entry.
+        for (let i = sourceBalances.length - 1; i >= 0; i--) {
+          const bVal = getMonthValue(sourceBalances[i].year, sourceBalances[i].month);
+          if (bVal <= endVal) {
+            closingTotal += sourceBalances[i].closingBalance;
+            break;
+          }
+        }
+      }
+    });
 
     return { opening: openingTotal, closing: closingTotal };
   }, [balances, selectedMonths, selectedYears, selectedSources, availableMonths, availableYears, availableSources]);

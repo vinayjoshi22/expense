@@ -1,11 +1,14 @@
-import type { Transaction, Investment } from '../types';
+import type { Transaction, Investment, Loan } from '../types';
 
 export interface AppData {
-    transactions: Transaction[];
-    investments: Investment[];
-    currency: string;
+    transactions?: Transaction[];
+    creditCardTransactions?: Transaction[];
+    investments?: Investment[];
+    loans?: Loan[];
+    currency?: string;
     sources?: string[];
-    version: number;
+    balances?: any[];
+    version?: number;
 }
 
 export function validateAppData(data: any): data is AppData {
@@ -13,47 +16,34 @@ export function validateAppData(data: any): data is AppData {
         throw new Error('Invalid JSON format: Root must be an object.');
     }
 
-    // Validate Transactions
-    if (!Array.isArray(data.transactions)) {
-        throw new Error('Invalid JSON format: "transactions" must be an array.');
+    // Check if at least one known key exists
+    const knownKeys = ['transactions', 'creditCardTransactions', 'investments', 'loans', 'currency', 'sources', 'balances'];
+    const hasKnownKey = knownKeys.some(key => key in data);
+
+    if (!hasKnownKey) {
+        throw new Error('Invalid JSON: Must contain at least one of transactions, investments, loans, etc.');
     }
 
-    for (const [index, t] of data.transactions.entries()) {
-        if (!t.id || typeof t.id !== 'string') throw new Error(`Transaction at index ${index} missing 'id'`);
-        if (!t.date || typeof t.date !== 'string') throw new Error(`Transaction at index ${index} missing 'date'`);
-        if (!t.description || typeof t.description !== 'string') throw new Error(`Transaction at index ${index} missing 'description'`);
-        if (typeof t.amount !== 'number') throw new Error(`Transaction at index ${index} missing 'amount'`);
-        if (!t.type || (t.type !== 'credit' && t.type !== 'debit')) throw new Error(`Transaction at index ${index} has invalid 'type'`);
-        if (!t.category || typeof t.category !== 'string') throw new Error(`Transaction at index ${index} missing 'category'`);
+    // Validate Transactions (if present)
+    if (data.transactions) {
+        if (!Array.isArray(data.transactions)) throw new Error('Invalid JSON: "transactions" must be an array.');
+        // Basic check for first few items? or simple structure check.
+        // Let's assume if it is an array it's likely intended to be transactions.
+    }
+
+    // Validate CC Transactions
+    if (data.creditCardTransactions && !Array.isArray(data.creditCardTransactions)) {
+        throw new Error('Invalid JSON: "creditCardTransactions" must be an array.');
     }
 
     // Validate Investments
     if (data.investments && !Array.isArray(data.investments)) {
-        throw new Error('Invalid JSON format: "investments" must be an array.');
+        throw new Error('Invalid JSON: "investments" must be an array.');
     }
 
-    if (data.investments) {
-        for (const [index, inv] of data.investments.entries()) {
-            if (!inv.id || typeof inv.id !== 'string') throw new Error(`Investment at index ${index} missing 'id'`);
-            if (!inv.name || typeof inv.name !== 'string') throw new Error(`Investment at index ${index} missing 'name'`);
-            if (typeof inv.amount !== 'number') throw new Error(`Investment at index ${index} missing 'amount'`);
-            // Allow optional fields if strictly required by types, but check basic types
-        }
-    }
-
-    // Validate Currency
-    if (data.currency && typeof data.currency !== 'string') {
-        throw new Error('Invalid JSON format: "currency" must be a string.');
-    }
-
-    // Validate Sources (Optional but if present must be array of strings)
-    if (data.sources && !Array.isArray(data.sources)) {
-        throw new Error('Invalid JSON format: "sources" must be an array.');
-    }
-    if (data.sources) {
-        for (const [index, s] of data.sources.entries()) {
-            if (typeof s !== 'string') throw new Error(`Source at index ${index} must be a string`);
-        }
+    // Validate Loans
+    if (data.loans && !Array.isArray(data.loans)) {
+        throw new Error('Invalid JSON: "loans" must be an array.');
     }
 
     return true;

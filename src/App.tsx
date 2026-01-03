@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Navbar, Container, Button, Row, Col, Collapse, Form, InputGroup, Modal, Dropdown } from 'react-bootstrap';
+import { Navbar, Container, Button, Row, Col, Collapse, Form, InputGroup, Modal, Dropdown, Toast, ToastContainer } from 'react-bootstrap';
 import { FileDrop } from './components/dashboard/FileDrop';
 import { SummaryCards } from './components/dashboard/SummaryCards';
 import { ExpenseCharts } from './components/dashboard/ExpenseCharts';
@@ -39,14 +39,16 @@ function App() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [error, setError] = useState<AppError | null>(null);
 
+  // Notification Toast State
+  const [notification, setNotification] = useState<{ show: boolean, title: string, message: string }>({ show: false, title: '', message: '' });
+
   // Load available models when API Key is set
   useEffect(() => {
+    // ... (existing effect code, assume handled by context or diff)
     if (apiKey) {
       fetchAvailableModels(apiKey).then(models => {
         if (models.length > 0) {
           setAvailableModels(models);
-          // If current selected model is NOT in list, revert to first available (safe default) or keep custom if legacy?
-          // Actually, let's just keep the user's choice unless it clearly fails, but the dropdown will show valid ones.
         }
       });
     }
@@ -484,9 +486,31 @@ function App() {
         }
 
         if (validateAppData(data)) {
-          newTransactions.push(...data.transactions);
+          if (data.transactions) newTransactions.push(...data.transactions);
+          // Credit Card Transactions - merge into newTransactions? Or need separate handling?
+          // Current ReviewModal takes 'transactions'. We might need to handle CC types there?
+          // Actually, App has `ccTransactions` state. But `handleFiles` -> `setReviewData` structure is focused on `transactions`.
+          // If we want to import CC transactions, we should probably add them to `newTransactions` but mark them?
+          // Or we can add them to `setCcTransactions` directly?
+          // ReviewModal currently supports `transactions` prop.
+          // Let's add them to `newTransactions` but ensuring they have source/type if possible?
+          // Wait, App.tsx has separate `ccTransactions` state. If we import JSON with `creditCardTransactions`,
+          // we should probably allow Reviewing them too.
+          // For now, let's treat them as transactions and let user Categorize/Review?
+          // BETTER: If the JSON explicitly has `creditCardTransactions`, maybe we should just import them directly or ask?
+          // Given the prompt "Review Extracted Data", sticking to `reviewData` is safest.
+          // BUT `reviewData` interface only has `transactions`.
+          // Let's merge `creditCardTransactions` into `transactions` for Review purpose,
+          // OR if we want to be smarter, we update `reviewData` type?
+          // Simpler approach: Just merge them into `newTransactions`. The user can sort it out or we add a property.
+          if (data.creditCardTransactions) {
+            // Ensure they have some marker? Or just push.
+            // Usually CC transactions might come from export which matches internal structure.
+            newTransactions.push(...data.creditCardTransactions);
+          }
+
           if (data.investments) newInvestments.push(...data.investments);
-          // JSON loans import support if schema has it? not strictly required yet but good for future.
+          if (data.loans) newLoans.push(...data.loans);
           if (data.currency) detectedCurrency = data.currency;
         }
       }
@@ -527,6 +551,38 @@ function App() {
             completedBatches: [...prev.completedBatches, { batchNum: i + 1, timeMs: Date.now() - batchStart }]
           }));
         }
+      }
+
+
+
+      // Check for Direct Import Scenario (JSON only, no transactions, but has investments/loans)
+      // This skips the Review Modal since there are no transactions to verify/categorize.
+      if (pdfFiles.length === 0 && newTransactions.length === 0 && (newInvestments.length > 0 || newLoans.length > 0)) {
+        let msg = [];
+        if (newInvestments.length > 0) {
+          setInvestments(prev => mergeInvestments(prev, newInvestments));
+          msg.push(`${newInvestments.length} Investments`);
+        }
+        if (newLoans.length > 0) {
+          setLoans(prev => mergeLoans(prev, newLoans));
+          // Update sources for loans
+          const loanSources = new Set(newLoans.map(l => l.source).filter(Boolean));
+          setSources(prev => {
+            const unique = new Set([...prev, ...Array.from(loanSources)]);
+            return Array.from(unique).sort();
+          });
+          msg.push(`${newLoans.length} Loans`);
+        }
+        if (detectedCurrency) setCurrency(detectedCurrency);
+        setShowUpload(false);
+        setProcessingStatus(prev => ({ ...prev, isActive: false }));
+
+        setNotification({
+          show: true,
+          title: "Import Successful",
+          message: `Successfully imported ${msg.join(' and ')}.`
+        });
+        return;
       }
 
       // Instead of merging immediately, trigger Review
@@ -1336,6 +1392,17 @@ function App() {
           }}>Delete Permanently</Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Notification Toast */}
+      <ToastContainer position="bottom-start" className="p-3" style={{ zIndex: 1060, position: 'fixed' }}>
+        <Toast show={notification.show} onClose={() => setNotification(prev => ({ ...prev, show: false }))} delay={5000} autohide bg="success">
+          <Toast.Header>
+            <strong className="me-auto text-dark">{notification.title}</strong>
+            <small>Just now</small>
+          </Toast.Header>
+          <Toast.Body className="text-white">{notification.message}</Toast.Body>
+        </Toast>
+      </ToastContainer>
 
       {/* Scroll To Top Button */}
       <ScrollToTop />

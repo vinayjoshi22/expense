@@ -1028,7 +1028,7 @@ function App() {
                 size="sm"
                 onClick={() => setShowHowItWorks(true)}
                 className="text-info border-info me-2"
-                style={{ '--bs-btn-color': '#0dcaf0', '--bs-btn-border-color': '#0dcaf0', '--bs-btn-hover-color': '#fff', '--bs-btn-hover-bg': '#0dcaf0' } as React.CSSProperties}
+                style={{ '--bs-btn-color': '#0dcaf0', '--bs-btn-border-color': '#0dcaf0', '--bs-btn-hover-color': '#ffffff', '--bs-btn-hover-bg': '#ffffffff' } as React.CSSProperties}
               >
                 How this works?
               </Button>

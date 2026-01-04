@@ -20,7 +20,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 const BACKUP_FILENAME = 'expense_analyzer_backup.json';
 
-let tokenClient: google.accounts.oauth2.TokenClient | null = null;
+let tokenClient: any | null = null;
 let gapiInited = false;
 let gisInited = false;
 
@@ -51,7 +51,7 @@ export const loadGoogleScripts = (callback: () => void) => {
     document.body.appendChild(script2);
 };
 
-export const initGoogleAuth = (clientId: string, onTokenCallback: (res: google.accounts.oauth2.TokenResponse) => void) => {
+export const initGoogleAuth = (clientId: string, onTokenCallback: (res: any) => void) => {
     appTokenCallback = onTokenCallback;
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
@@ -127,7 +127,7 @@ let pendingTokenResolve: (() => void) | null = null;
 let pendingTokenReject: ((err: any) => void) | null = null;
 
 // Wrap the original callback to handle pending promises
-const handleTokenResponse = (res: google.accounts.oauth2.TokenResponse) => {
+const handleTokenResponse = (res: any) => {
     if (res && res.access_token) {
         if (pendingTokenResolve) {
             pendingTokenResolve();
@@ -147,7 +147,7 @@ const handleTokenResponse = (res: google.accounts.oauth2.TokenResponse) => {
     }
 };
 
-let appTokenCallback: ((res: google.accounts.oauth2.TokenResponse) => void) | null = null;
+let appTokenCallback: ((res: any) => void) | null = null;
 
 
 // --- Drive Operations ---
@@ -162,7 +162,7 @@ export const findBackupFile = async (): Promise<string | null> => {
         });
         const files = response.result.files;
         if (files && files.length > 0) {
-            return files[0].id; // Return ID of existing file
+            return files[0].id || null; // Return ID of existing file
         }
         return null;
     } catch (err) {

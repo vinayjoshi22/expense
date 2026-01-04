@@ -1075,40 +1075,7 @@ function App() {
   // This implies Net Savings should also update, otherwise `Income - Expense != Savings` which confuses users.
   // I will use `totalExpenseCustom` for Savings calculation too to maintain consistency in the top row.
 
-  // Auto-backup debounce
-  useEffect(() => {
-    if (!isConnected) return;
 
-    const timeout = setTimeout(async () => {
-      console.log("Auto-backup starting...");
-      setBackupStatus('backing_up');
-      try {
-        const fullData = {
-          transactions,
-          investments,
-          loans,
-          ccTransactions,
-          balances,
-          currency,
-          sources,
-          excludedCategories: Array.from(excludedCategories),
-          includedInvestmentCategories: Array.from(includedInvestmentCategories),
-          settings: { theme, dontAskDeleteAgain, model },
-          version: 1
-        };
-        const result = await uploadBackup(fullData);
-        setLastBackupTime(result.time);
-        localStorage.setItem('EA_LAST_BACKUP_TIME', result.time);
-        setBackupStatus('success');
-        setTimeout(() => setBackupStatus('idle'), 2000);
-      } catch (err) {
-        console.error("Auto-backup failed", err);
-        setBackupStatus('error');
-      }
-    }, 10000); // 10 seconds debounce
-
-    return () => clearTimeout(timeout);
-  }, [transactions, investments, loans, ccTransactions, balances, currency, sources, excludedCategories, includedInvestmentCategories, theme, dontAskDeleteAgain, model, isConnected]);
 
   return (
     <div className="min-vh-100 d-flex flex-column">

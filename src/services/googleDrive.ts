@@ -129,6 +129,7 @@ let pendingTokenReject: ((err: any) => void) | null = null;
 // Wrap the original callback to handle pending promises
 const handleTokenResponse = (res: any) => {
     if (res && res.access_token) {
+        gapi.client.setToken(res); // Store the token!
         if (pendingTokenResolve) {
             pendingTokenResolve();
             pendingTokenResolve = null;
@@ -171,27 +172,27 @@ export const findBackupFile = async (): Promise<string | null> => {
     }
 };
 
-export const uploadBackup = async (data: any): Promise<{ id: string, time: string }> => {
-    await ensureToken();
-    const fileContent = JSON.stringify(data);
-    const fileId = await findBackupFile();
-
-    const metadata = {
-        name: BACKUP_FILENAME,
-        mimeType: 'application/json',
-        parents: !fileId ? ['appDataFolder'] : undefined // Only set parent on creation
-    } as any;
-
-    const multipartRequestBody =
-        `\r\n--foo_bar_baz\r\n` +
-        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-        JSON.stringify(metadata) +
-        `\r\n--foo_bar_baz\r\n` +
-        `Content-Type: application/json\r\n\r\n` +
-        fileContent +
-        `\r\n--foo_bar_baz--`;
-
+export const uploadBackup = async (data: any, isRetry = false): Promise<{ id: string, time: string }> => {
     try {
+        await ensureToken();
+        const fileContent = JSON.stringify(data);
+        const fileId = await findBackupFile();
+
+        const metadata = {
+            name: BACKUP_FILENAME,
+            mimeType: 'application/json',
+            parents: !fileId ? ['appDataFolder'] : undefined // Only set parent on creation
+        } as any;
+
+        const multipartRequestBody =
+            `\r\n--foo_bar_baz\r\n` +
+            `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+            JSON.stringify(metadata) +
+            `\r\n--foo_bar_baz\r\n` +
+            `Content-Type: application/json\r\n\r\n` +
+            fileContent +
+            `\r\n--foo_bar_baz--`;
+
         let response;
         if (fileId) {
             // Update existing file
@@ -216,24 +217,34 @@ export const uploadBackup = async (data: any): Promise<{ id: string, time: strin
             id: response.result.id,
             time: new Date().toISOString()
         };
-    } catch (err) {
+    } catch (err: any) {
+        if (!isRetry && (err.status === 401 || err.result?.error?.code === 401)) {
+            console.log("Token expired, refreshing...");
+            gapi.client.setToken(null);
+            return uploadBackup(data, true);
+        }
         console.error("Error uploading backup:", err);
         throw err;
     }
 };
 
-export const downloadBackup = async (): Promise<any> => {
-    await ensureToken();
-    const fileId = await findBackupFile();
-    if (!fileId) throw new Error("No backup found.");
-
+export const downloadBackup = async (isRetry = false): Promise<any> => {
     try {
+        await ensureToken();
+        const fileId = await findBackupFile();
+        if (!fileId) throw new Error("No backup found.");
+
         const response = await gapi.client.drive.files.get({
             fileId: fileId,
             alt: 'media'
         });
         return response.result; // Should be the JSON object
-    } catch (err) {
+    } catch (err: any) {
+        if (!isRetry && (err.status === 401 || err.result?.error?.code === 401)) {
+            console.log("Token expired, refreshing...");
+            gapi.client.setToken(null);
+            return downloadBackup(true);
+        }
         console.error("Error downloading backup:", err);
         throw err;
     }

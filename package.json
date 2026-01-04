@@ -12,6 +12,9 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@types/file-saver": "^2.0.7",
+    "@types/gapi": "^0.0.47",
+    "@types/gapi.auth2": "^0.0.61",
+    "@types/gapi.client.drive": "^3.0.15",
     "bootstrap": "^5.3.8",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",

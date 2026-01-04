@@ -13,7 +13,9 @@ import { loadTransactions, saveTransactions, loadCurrency, saveCurrency, mergeTr
 import type { Transaction, AppError, Investment, StatementBalance, Loan } from './types';
 import { validateAppData, type AppData } from './lib/validator';
 import { saveAs } from 'file-saver';
-import { Key, Trash2, Plus, Wallet, ChevronDown, ChevronUp, Download, Moon, Sun } from 'lucide-react';
+import { Key, Plus, Wallet, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { loadGoogleScripts, uploadBackup, downloadBackup, initGoogleAuth } from './services/googleDrive';
+import { SettingsModal } from './components/ui/SettingsModal';
 
 import { DashboardControls } from './components/dashboard/DashboardControls';
 import { HowItWorksModal } from './components/ui/HowItWorksModal';
@@ -42,6 +44,10 @@ function App() {
   // Notification Toast State
   const [notification, setNotification] = useState<{ show: boolean, title: string, message: string }>({ show: false, title: '', message: '' });
 
+  // Google Drive Integration State
+  const [isConnected, setIsConnected] = useState(localStorage.getItem('EA_GOOGLE_CONNECTED') === 'true');
+  const googleClientId = localStorage.getItem('EA_GOOGLE_CLIENT_ID') || '823725584934-cp7pfh5i05sra6f73d6522d8be4o61qk.apps.googleusercontent.com';
+
   // Load available models when API Key is set
   useEffect(() => {
     // ... (existing effect code, assume handled by context or diff)
@@ -57,7 +63,31 @@ function App() {
   // UI States
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showKeyInput, setShowKeyInput] = useState(!apiKey);
+
+  // Backup State
+  const [backupStatus, setBackupStatus] = useState<'idle' | 'backing_up' | 'restoring' | 'success' | 'error'>('idle');
+  const [lastBackupTime, setLastBackupTime] = useState<string | null>(localStorage.getItem('EA_LAST_BACKUP_TIME'));
+
+  useEffect(() => {
+    // Load Google Drive Scripts
+    loadGoogleScripts(() => {
+      console.log('Google Scripts Loaded');
+      // If previously connected, initialize auth silently to be ready for token requests
+      if (isConnected) {
+        initGoogleAuth(googleClientId, (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            setIsConnected(true);
+          }
+        });
+        // We don't call requestAccessToken() here to avoid popup on load. 
+        // It will be called on-demand by uploadBackup/downloadBackup if token is missing (needs wrapper update) 
+        // OR we rely on user clicking "Connect" again if actual token expired.
+        // But to fix "asking every time", we at least keep isConnected=true so UI doesn't show "Connect".
+      }
+    });
+  }, [isConnected]);
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -664,6 +694,7 @@ function App() {
   };
 
   const [showClearDataModal, setShowClearDataModal] = useState(false);
+  const [clearDataTab, setClearDataTab] = useState<'transactions' | 'investments' | 'reset'>('transactions');
 
   const handleClearAll = () => {
     setTransactions([]);
@@ -1044,6 +1075,41 @@ function App() {
   // This implies Net Savings should also update, otherwise `Income - Expense != Savings` which confuses users.
   // I will use `totalExpenseCustom` for Savings calculation too to maintain consistency in the top row.
 
+  // Auto-backup debounce
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const timeout = setTimeout(async () => {
+      console.log("Auto-backup starting...");
+      setBackupStatus('backing_up');
+      try {
+        const fullData = {
+          transactions,
+          investments,
+          loans,
+          ccTransactions,
+          balances,
+          currency,
+          sources,
+          excludedCategories: Array.from(excludedCategories),
+          includedInvestmentCategories: Array.from(includedInvestmentCategories),
+          settings: { theme, dontAskDeleteAgain, model },
+          version: 1
+        };
+        const result = await uploadBackup(fullData);
+        setLastBackupTime(result.time);
+        localStorage.setItem('EA_LAST_BACKUP_TIME', result.time);
+        setBackupStatus('success');
+        setTimeout(() => setBackupStatus('idle'), 2000);
+      } catch (err) {
+        console.error("Auto-backup failed", err);
+        setBackupStatus('error');
+      }
+    }, 10000); // 10 seconds debounce
+
+    return () => clearTimeout(timeout);
+  }, [transactions, investments, loans, ccTransactions, balances, currency, sources, excludedCategories, includedInvestmentCategories, theme, dontAskDeleteAgain, model, isConnected]);
+
   return (
     <div className="min-vh-100 d-flex flex-column">
       {/* Navbar */}
@@ -1109,22 +1175,18 @@ function App() {
                     <Plus size={16} className={`me-1 transition-transform ${showUpload ? 'rotate-45' : ''}`} />
                     Add Files
                   </Button>
-                  <Button variant="danger" size="sm" onClick={() => setShowClearDataModal(true)}>
-                    <Trash2 size={14} />
-                  </Button>
+
                 </>
               )}
-              <Button variant="outline-light" size="sm" onClick={handleExport} title="Export Data">
-                <Download size={16} />
-              </Button>
+
               <div className="vr bg-white opacity-25 mx-1"></div>
               <Button
-                variant="outline-light"
-                size="sm"
-                onClick={toggleTheme}
-                title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+                variant="link"
+                className="nav-link text-secondary"
+                onClick={() => setShowSettings(true)}
+                title="Settings"
               >
-                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+                <Settings size={20} />
               </Button>
             </div>
           </Navbar.Collapse>
@@ -1138,6 +1200,7 @@ function App() {
         onClearInvestments={handleClearInvestments}
         onClearTransactions={handleClearTransactions}
         availableYears={availableYears}
+        initialTab={clearDataTab}
       />
 
       {/* How It Works Modal */}
@@ -1440,6 +1503,108 @@ function App() {
           <Toast.Body className="text-white">{notification.message}</Toast.Body>
         </Toast>
       </ToastContainer>
+
+      {/* Scroll To Top Button */}
+      <ScrollToTop />
+      <SettingsModal
+        show={showSettings}
+        onHide={() => setShowSettings(false)}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onClearData={(type) => {
+          if (type === 'all') {
+            setClearDataTab('reset');
+            setShowClearDataModal(true);
+          } else if (type === 'transactions') {
+            setClearDataTab('transactions');
+            setShowClearDataModal(true);
+          } else if (type === 'investments') {
+            setClearDataTab('investments');
+            setShowClearDataModal(true);
+          }
+        }}
+        onBackup={async () => {
+          setBackupStatus('backing_up');
+          try {
+            const data: AppData = {
+              transactions,
+              investments,
+              loans, // Added loans support
+              currency,
+              sources,
+              version: 1,
+              // TODO: Add ccTransactions to export data type if missing
+              // For now, assume export logic handles it or we improve data type
+            };
+            // Quick fix: Add missing fields to AppData or just cast
+            const fullData = {
+              ...data,
+              ccTransactions,
+              loans,
+              balances,
+              excludedCategories: Array.from(excludedCategories),
+              includedInvestmentCategories: Array.from(includedInvestmentCategories),
+              settings: {
+                theme,
+                dontAskDeleteAgain,
+                model
+              }
+            };
+
+            const result = await uploadBackup(fullData);
+            setLastBackupTime(result.time);
+            localStorage.setItem('EA_LAST_BACKUP_TIME', result.time);
+            setBackupStatus('success');
+            setTimeout(() => setBackupStatus('idle'), 3000);
+          } catch (error) {
+            console.error("Backup failed", error);
+            setBackupStatus('error');
+          }
+        }}
+        onRestore={async () => {
+          setBackupStatus('restoring');
+          try {
+            const data = await downloadBackup();
+            if (data) {
+              // Restore State
+              if (data.transactions) setTransactions(data.transactions);
+              if (data.ccTransactions) setCcTransactions(data.ccTransactions);
+              if (data.investments) setInvestments(data.investments);
+              if (data.loans) setLoans(data.loans);
+              if (data.balances) setBalances(data.balances);
+              if (data.currency) setCurrency(data.currency);
+              if (data.sources) setSources(data.sources);
+
+              if (data.excludedCategories) setExcludedCategories(new Set(data.excludedCategories));
+              if (data.includedInvestmentCategories) setIncludedInvestmentCategories(new Set(data.includedInvestmentCategories));
+
+              if (data.settings) {
+                if (data.settings.theme) setTheme(data.settings.theme);
+                if (data.settings.dontAskDeleteAgain !== undefined) setDontAskDeleteAgain(data.settings.dontAskDeleteAgain);
+                if (data.settings.model) setModel(data.settings.model);
+              }
+
+              setBackupStatus('success');
+              window.location.reload(); // Reload to ensure clean state
+            }
+          } catch (error) {
+            console.error("Restore failed", error);
+            setBackupStatus('error');
+          }
+        }}
+        onExport={handleExport}
+        backupStatus={backupStatus}
+        lastBackupTime={lastBackupTime}
+        isConnected={isConnected}
+        onConnectionChange={(connected) => {
+          setIsConnected(connected);
+          if (connected) {
+            localStorage.setItem('EA_GOOGLE_CONNECTED', 'true');
+          } else {
+            localStorage.removeItem('EA_GOOGLE_CONNECTED');
+          }
+        }}
+      />
 
       {/* Scroll To Top Button */}
       <ScrollToTop />

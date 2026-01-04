@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button, Form, Tab, Nav, Alert } from 'react-bootstrap';
 import { Trash2, AlertTriangle, Calendar, PieChart } from 'lucide-react';
 
@@ -9,6 +9,7 @@ interface ClearDataModalProps {
     onClearInvestments: () => void;
     onClearTransactions: (year?: string, month?: string, accountType?: 'all' | 'bank' | 'cc') => void;
     availableYears: string[];
+    initialTab?: 'transactions' | 'investments' | 'reset';
 }
 
 export function ClearDataModal({
@@ -17,16 +18,24 @@ export function ClearDataModal({
     onClearAll,
     onClearInvestments,
     onClearTransactions,
-    availableYears
+    availableYears,
+    initialTab = 'transactions'
 }: ClearDataModalProps) {
-    const [activeTab, setActiveTab] = useState('transactions');
+    const [activeTab, setActiveTab] = useState<'transactions' | 'investments' | 'reset'>(initialTab);
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedMonth, setSelectedMonth] = useState<string>('');
     const [accountType, setAccountType] = useState<'all' | 'bank' | 'cc'>('all');
 
+    // Sync tab when prop changes or modal opens
+    useEffect(() => {
+        if (show && initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [show, initialTab]);
+
     // Reset selection on open/tab change
     const handleTabSelect = (k: string | null) => {
-        if (k) setActiveTab(k);
+        if (k) setActiveTab(k as any);
         setSelectedYear('');
         setSelectedMonth('');
         setAccountType('all');
